@@ -48,5 +48,18 @@ def load_departments(simplify_deg: float = 0.01) -> gpd.GeoDataFrame:
 
 
 def to_geojson(gdf: gpd.GeoDataFrame) -> dict:
-    """GeoJSON con id = código DIVIPOLA (para featureidkey de Plotly)."""
-    return gdf.set_index("codigo_divipola")[["geometry"]].__geo_interface__
+    """GeoJSON con el código DIVIPOLA en id y properties para enlazar mapas.
+
+    Plotly y MapLibre no siempre tratan el índice de un GeoDataFrame como `id`.
+    Guardar el código en ambos lugares hace explícita y estable la unión espacial.
+    """
+    features = []
+    for code, geometry in gdf[["codigo_divipola", "geometry"]].itertuples(index=False, name=None):
+        code = str(code)
+        features.append({
+            "type": "Feature",
+            "id": code,
+            "properties": {"codigo_divipola": code},
+            "geometry": geometry.__geo_interface__,
+        })
+    return {"type": "FeatureCollection", "features": features}
