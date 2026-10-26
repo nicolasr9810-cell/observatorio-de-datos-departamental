@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+import pandas as pd
 import pytest
 
 from observatorio.analytics import dimred, eda, explain, ml, policy, spatial, timeseries
 from observatorio.core import panel
 from observatorio.core.http import InsufficientDataError
 from observatorio.core.normalize import norm_code, norm_dept, to_number
+from observatorio.data.geo import to_geojson
+from observatorio.viz import maps
 
 from conftest import IND
 
@@ -20,6 +23,14 @@ def test_panel_no_imputation(master):
     m = master.drop(master.index[:10])
     mat = panel.panel(m, IND)
     assert mat.data.notna().all().all() and mat.dropped > 0
+
+
+def test_cross_section_coverage_reports_complete_cases(master):
+    sparse = master[~((master.codigo_divipola == "52") & (master.anio == 2020) &
+                      (master.indicador == IND[0]))]
+    coverage = panel.cross_section_coverage(sparse, IND)
+    count = coverage.loc[coverage["Año"] == 2020, "Departamentos completos"].iloc[0]
+    assert count == master.codigo_divipola.nunique() - 1
 
 
 def test_eda(master):
@@ -97,6 +108,23 @@ def test_spatial(master, grid):
     assert len(spatial.build_weights(gdf, "KNN", 4).neighbors) == len(gdf)
 
 
+def test_map_geojson_joins_by_department_code(grid):
+    geojson = to_geojson(grid)
+    feature = geojson["features"][0]
+    assert feature["id"] == feature["properties"]["codigo_divipola"] == grid.codigo_divipola.iloc[0]
+    values = grid.iloc[:-1][["codigo_divipola"]].assign(valor=np.arange(len(grid) - 1, dtype=float))
+    fig = maps.choropleth(grid, values, "valor")
+    trace = fig.data[0]
+    assert trace.featureidkey == "properties.codigo_divipola"
+    assert set(trace.locations) == set(grid.codigo_divipola)
+    assert pd.isna(dict(zip(trace.locations, trace.z))[grid.codigo_divipola.iloc[-1]])
+    missing_layer = next(trace for trace in fig.data if trace.type == "choroplethmap" and trace.showscale is False)
+    assert missing_layer.featureidkey == "properties.codigo_divipola"
+    assert list(missing_layer.locations) == [grid.codigo_divipola.iloc[-1]]
+    lisa = pd.DataFrame({"Cuadrante": ["No significativo"] * len(grid), "p": [1.0] * len(grid)})
+    assert maps.lisa_map(grid, lisa).data[0].featureidkey == "properties.codigo_divipola"
+
+
 def test_sar_branch(grid):
     rng = np.random.default_rng(1)
     gdf = grid.copy()
@@ -108,3 +136,5 @@ def test_sar_branch(grid):
     assert fit.recommended in {"SAR", "SEM"}
     if fit.recommended == "SAR":
         assert 0.3 < fit.rho < 0.95 and fit.impacts is not None
+    scenario = spatial.fit_sar(gdf, "y", ["x1", "x2"], w)
+    assert 0.3 < scenario.rho < 0.95 and scenario.impacts is not None

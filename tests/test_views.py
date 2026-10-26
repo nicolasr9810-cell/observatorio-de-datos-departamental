@@ -28,6 +28,12 @@ def test_view_runs(view):
     assert not at.error, [e.value for e in at.error]
 
 
+def test_app_starts_on_welcome_page():
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300).run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert any("Bienvenido al Observatorio" in item.value for item in at.title)
+
+
 def test_simulation_chain():
     """Espacial → simulación y VAR → simulación comparten estado de sesión."""
     at = AppTest.from_file(str(ROOT / "views" / "timeseries.py"), default_timeout=300).run()
@@ -55,4 +61,4 @@ def test_spatial_simulation_sar(grid):
     at.session_state["sp_last"] = {"fit": fit, "gdf": gdf, "w": w, "feats": ["x1", "x2"], "target": "y", "year": 2020}
     at.run()
     assert not at.exception, [e.message for e in at.exception]
-    assert not at.info  # no pidió estimar primero: simuló
+    assert any("El escenario cambia" in item.value for item in at.markdown)
