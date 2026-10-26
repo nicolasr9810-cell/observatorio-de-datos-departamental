@@ -1,78 +1,84 @@
-OBSERVATORIO SOCIOECONÓMICO - EJECUCIÓN EN GOOGLE COLAB
-=========================================================
+OBSERVATORIO SOCIOECONÓMICO v2 - GOOGLE COLAB
+=============================================
 
-Antes de iniciar
-----------------
-Carga los archivos app.py y requirements.txt en el notebook de Colab.
-README.md explica las fuentes y el despliegue posterior en Streamlit Community Cloud.
+Colab funciona como cliente del paquete: el código vive en GitHub y el notebook
+lo importa. Lo que funcione en una celda se convierte en una función dentro de
+observatorio/analytics/ y se agrega una prueba en tests/.
 
-CELDA 1 - SUBIR ARCHIVOS DESDE EL COMPUTADOR
+CELDA 1 - CLONAR E INSTALAR
 
-from google.colab import files
-uploaded = files.upload()
+REPO = "https://github.com/<tu-usuario>/observatorio.git"   # reemplaza
+!git clone -q $REPO /content/observatorio || (cd /content/observatorio && git pull -q)
+%cd /content/observatorio
+!pip -q install -r requirements-dev.txt pyngrok
+!pip -q install -e .
 
-En el cuadro selecciona app.py y requirements.txt.
+(Sin GitHub: sube el .zip y ejecuta !unzip -q observatorio.zip -d /content/observatorio)
 
-CELDA 2 - INSTALAR DEPENDENCIAS
+CELDA 2 - VERIFICAR
 
-!pip -q install -r requirements.txt pyngrok
+!python -m pytest -q
 
-CELDA 3 - CONFIGURAR NGROK
+CELDA 3 - EXPERIMENTAR CON LOS MISMOS MÓDULOS DE LA APP
+
+from observatorio.data.pipeline import load_all
+from observatorio.data.geo import load_departments
+from observatorio.core import panel
+from observatorio.analytics import eda, ml, explain, dimred, timeseries, spatial, policy
+from observatorio.viz import maps, charts
+
+master, quality = load_all()          # fail-fast: si una fuente falla, se detiene
+gdf = load_departments()
+ind = ["PIB por habitante", "Pobreza monetaria", "Coeficiente de Gini"]
+
+ts = panel.territory_series(master, ind, "52").data   # Nariño
+modelo, estacionariedad, johansen = timeseries.auto_model(ts)
+print(modelo.model_type, modelo.notes)
+charts.irf(timeseries.irf_table(modelo, ind[0]), ind[0]).show()
+
+CELDA 4 - (OPCIONAL) ENTRENAR UN MODELO COSTOSO Y GUARDARLO PARA LA APP
+
+from observatorio.core.artifacts import save_model
+m = panel.panel(master, ind)
+X, y, g = ml.supervised_frame(m.data, "Pobreza monetaria", ["PIB por habitante", "Coeficiente de Gini"], lag=1)
+fit = ml.fit_evaluate(X, y, g, "Red neuronal (MLP)")
+save_model("mlp_pobreza", fit.pipeline, X, {"target": "Pobreza monetaria", "lag": 1})
+!git add artifacts && git commit -m "Modelo MLP pobreza" && git push    # requiere credenciales
+
+CELDA 5 - CONFIGURAR NGROK
 
 En el panel lateral de Colab abre Secrets (icono de llave) y crea:
   Nombre: NGROK_AUTHTOKEN
   Valor: tu token privado de ngrok
+No guardes el token en una celda, un archivo ni en GitHub.
 
-Habilita el acceso del notebook al secreto. No guardes el token en una celda,
-un archivo ni en GitHub.
+CELDA 6 - INICIAR STREAMLIT Y ABRIR EL TÚNEL
 
-CELDA 4 - INICIAR STREAMLIT Y ABRIR EL TÚNEL
-
-import subprocess
-import time
+import subprocess, time
 from pathlib import Path
 from google.colab import userdata
 from pyngrok import ngrok
 
 token = userdata.get("NGROK_AUTHTOKEN")
 if not token:
-    raise RuntimeError(
-        "Falta NGROK_AUTHTOKEN. Agrégalo en Colab Secrets y habilita su acceso."
-    )
-
+    raise RuntimeError("Falta NGROK_AUTHTOKEN en Colab Secrets.")
 ngrok.set_auth_token(token)
 log_path = Path("/content/streamlit.log")
 log_file = log_path.open("w")
 process = subprocess.Popen(
-    [
-        "streamlit", "run", "/content/app.py",
-        "--server.port", "8501",
-        "--server.address", "0.0.0.0",
-        "--server.headless", "true",
-    ],
-    stdout=log_file,
-    stderr=subprocess.STDOUT,
+    ["streamlit", "run", "/content/observatorio/app.py", "--server.port", "8501",
+     "--server.address", "0.0.0.0", "--server.headless", "true"],
+    cwd="/content/observatorio", stdout=log_file, stderr=subprocess.STDOUT,
 )
-time.sleep(8)
-
+time.sleep(10)
 if process.poll() is not None:
     log_file.flush()
-    raise RuntimeError(
-        "Streamlit se detuvo al iniciar. Revisa /content/streamlit.log: "
-        + log_path.read_text(errors="replace")[-5000:]
-    )
-
+    raise RuntimeError("Streamlit se detuvo: " + log_path.read_text(errors="replace")[-5000:])
 public_url = ngrok.connect(8501, "http").public_url
 print("URL temporal del Observatorio:", public_url)
 
-CELDA 5 - CERRAR TÚNEL (OPCIONAL)
+CELDA 7 - CERRAR
 
 ngrok.disconnect(public_url)
 process.terminate()
 log_file.close()
-
-Notas
------
-La URL es temporal mientras el runtime de Colab siga activo.
-Si una fuente activa falla o cambia de esquema, Streamlit muestra el error
-técnico y se detiene; no crea datos alternativos.

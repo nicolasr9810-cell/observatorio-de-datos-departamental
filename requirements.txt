@@ -1,5 +1,24 @@
-streamlit>=1.36,<2.0
+# --- Interfaz y datos (base original) ---
+streamlit>=1.50,<2.0          # st.navigation + width="stretch"
 pandas>=2.1,<4.0
-plotly>=5.24,<7.0
+numpy>=1.26,<3.0
+plotly>=5.24,<8.0             # px.choropleth_map (MapLibre, sin token)
 requests>=2.31,<3.0
 openpyxl>=3.1,<4.0
+
+# --- Estadística, econometría y series de tiempo ---
+scipy>=1.11,<2.0
+statsmodels>=0.14,<0.16       # VAR, VECM, Johansen, ADF/KPSS, VIF
+
+# --- Machine Learning e interpretabilidad ---
+scikit-learn>=1.4,<2.0        # Ridge, Lasso, SVR, MLP, PCA, K-means
+shap>=0.45,<1.0
+joblib>=1.3,<2.0              # artefactos entrenados en Colab
+
+# --- Espacial ---
+geopandas>=1.0,<2.0
+shapely>=2.0,<3.0
+pyogrio>=0.7,<1.0             # lector de vectores de GeoPandas 1.x
+libpysal>=4.10,<5.0           # matrices de pesos W
+esda>=2.5,<3.0                # Moran global y LISA
+spreg>=1.5,<2.0               # OLS con pruebas LM, ML_Lag (SAR), ML_Error (SEM)

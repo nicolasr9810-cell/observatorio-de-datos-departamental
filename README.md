@@ -3,12 +3,29 @@
 
 Aplicación en Streamlit y Plotly. Las fuentes activas se consultan en vivo. No usa filas sintéticas, no rellena ausentes con cero y detiene la carga completa cuando falla una fuente obligatoria.
 
-## Archivos
+## Estructura (v2, modular)
 
-- app.py: aplicación, conectores, preprocesamiento y visualizaciones.
-- requirements.txt: dependencias para Colab o Streamlit Community Cloud.
-- colab_celdas.txt: instrucciones para ejecutar en Colab y abrir un túnel de prueba.
-- FUENTES_PENDIENTES.md: cobertura pendiente y contratos de integración.
+- `app.py`: solo navegación (`st.navigation`). Cada módulo es una vista en `views/`.
+- `observatorio/`: paquete importable con conectores (`data/`), contrato y utilidades (`core/`), modelos (`analytics/`), figuras (`viz/`) y caché/UI (`ui/`).
+- `ROADMAP.md`: arquitectura, fases de integración y flujo Colab ↔ app.
+- `tests/`: pruebas con `pytest`. Los datos de prueba existen solo ahí.
+- `requirements.txt`: dependencias de producción (Streamlit Cloud). `requirements-dev.txt` agrega pytest.
+- `colab_celdas.txt`: clona el repositorio en Colab, importa el paquete y abre el túnel.
+- `FUENTES_PENDIENTES.md`: cobertura pendiente y contratos de integración.
+
+## Módulos analíticos
+
+| Vista | Métodos |
+|---|---|
+| Panorama | KPIs de Nariño, tendencias, ranking, dispersión, mapa coroplético |
+| Análisis exploratorio | Perfil, normalidad, atípicos, correlaciones con p-valor, VIF, hallazgos automáticos |
+| Machine Learning + SHAP | Ridge, Lasso, SVR (SVM), red neuronal MLP; validación por departamento o temporal; SHAP |
+| PCA y tipologías | PCA, índice sintético 0–100, K-means por silueta, mapas |
+| VAR y VECM | ADF/KPSS, Johansen, VAR/VECM, Granger, impulso-respuesta, pronóstico |
+| Econometría espacial | W reina/KNN, Moran global, LISA, OLS → SAR/SEM con pruebas LM, impactos directos/indirectos |
+| Simulación de políticas | Derrames SAR, choques VAR/VECM, contrafactual ML |
+
+Todos los modelos usan casos completos y reportan cuántas filas descartaron. Cuando no hay observaciones suficientes, la vista muestra un aviso y no estima.
 
 ## Indicadores incluidos
 
@@ -49,7 +66,12 @@ La dirección local por defecto es http://localhost:8501.
 
 ## Streamlit Community Cloud
 
-Sube app.py y requirements.txt a un repositorio GitHub. Crea una app de Streamlit Community Cloud que apunte a app.py. README.md y colab_celdas.txt son documentación.
+Sube el repositorio completo a GitHub (app.py, views/, observatorio/, requirements.txt, FUENTES_PENDIENTES.md). Crea una app de Streamlit Community Cloud que apunte a app.py.
+
+## Pruebas
+
+    python -m pip install -r requirements-dev.txt
+    python -m pytest -q
 
 ## Google Colab
 

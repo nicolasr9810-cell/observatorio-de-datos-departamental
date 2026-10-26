@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8
+pyflakes>=3
+# Opcional, solo si migras a series mensuales y quieres LSTM (no subir a Streamlit Cloud):
+# torch>=2.3 --index-url https://download.pytorch.org/whl/cpu
