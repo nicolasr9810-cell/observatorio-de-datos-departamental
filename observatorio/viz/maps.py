@@ -45,12 +45,14 @@ def choropleth(gdf: gpd.GeoDataFrame, values: pd.DataFrame, value_col: str, titl
         kw = {"color_continuous_scale": "RdBu_r", "range_color": (-m, m)}
     else:
         kw = {"color_continuous_scale": scale}
-    fig = px.choropleth_map(data, geojson=to_geojson(gdf), locations="codigo_divipola", color=value_col,
+    fig = px.choropleth_map(data, geojson=to_geojson(gdf), featureidkey="properties.codigo_divipola",
+                            locations="codigo_divipola", color=value_col,
                             hover_name="departamento", hover_data={"codigo_divipola": False, value_col: ":,.3f"},
                             opacity=.8, labels={value_col: unit or value_col}, **kw)
     missing = data[data[value_col].isna()]
     if not missing.empty:
-        fig.add_trace(go.Choroplethmap(geojson=to_geojson(gdf), locations=missing.codigo_divipola,
+        fig.add_trace(go.Choroplethmap(geojson=to_geojson(gdf), featureidkey="properties.codigo_divipola",
+                                       locations=missing.codigo_divipola,
                                        z=[0] * len(missing), colorscale=[[0, "#cccccc"], [1, "#cccccc"]],
                                        showscale=False, text=missing.departamento,
                                        hovertemplate="%{text}: sin dato<extra></extra>"))
@@ -63,7 +65,8 @@ def lisa_map(gdf: gpd.GeoDataFrame, lisa: pd.DataFrame, title: str = "Clústeres
     """gdf y lisa en el mismo orden (salida de spatial.align + spatial.local_moran)."""
     data = gdf[["codigo_divipola", "departamento"]].assign(Cuadrante=lisa["Cuadrante"].values,
                                                            p=lisa["p"].values)
-    fig = px.choropleth_map(data, geojson=to_geojson(gdf), locations="codigo_divipola", color="Cuadrante",
+    fig = px.choropleth_map(data, geojson=to_geojson(gdf), featureidkey="properties.codigo_divipola",
+                            locations="codigo_divipola", color="Cuadrante",
                             color_discrete_map=LISA_COLORS, hover_name="departamento",
                             hover_data={"codigo_divipola": False, "p": ":.3f"}, opacity=.85,
                             category_orders={"Cuadrante": list(LISA_COLORS)})
