@@ -10,9 +10,11 @@ from observatorio.core import panel
 FOCUS = ["Nariño", "Cauca", "Valle del Cauca", "Putumayo"]
 
 
-def header(title: str, help_text: str):
+def header(title: str, help_text: str, plain_language: str | None = None):
     st.title(title)
     st.caption(help_text)
+    if plain_language:
+        st.info(f"**En palabras sencillas:** {plain_language}")
 
 
 def pick_indicators(master: pd.DataFrame, label: str = "Indicadores", key: str = "ind",

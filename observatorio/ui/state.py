@@ -89,3 +89,9 @@ def ts_model(df, mode: str, maxlags: int, steps: int, rank: int = 1):
 @st.cache_resource(show_spinner="Construyendo matriz de pesos espaciales…", max_entries=16)
 def weights(_gdf, key: tuple, kind: str, k: int):
     return spatial.build_weights(_gdf, kind, k)
+
+
+@st.cache_resource(show_spinner="Estimando SAR para el escenario…", max_entries=16)
+def sar_model(_gdf, _w, key: tuple, target: str, features: tuple[str, ...]):
+    """Ajuste SAR alternativo cacheado para simulación de derrames."""
+    return spatial.fit_sar(_gdf, target, list(features), _w)
