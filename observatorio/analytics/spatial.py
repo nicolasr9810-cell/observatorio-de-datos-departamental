@@ -19,6 +19,7 @@ from libpysal.weights.util import attach_islands
 from observatorio.core.http import InsufficientDataError
 
 PROJECTED = "EPSG:9377"   # MAGNA-SIRGAS Origen Nacional (distancias en metros)
+MIN_SPATIAL_N = 20
 QUAD = {1: "Alto-Alto", 2: "Bajo-Alto", 3: "Bajo-Bajo", 4: "Alto-Bajo"}
 
 
@@ -26,8 +27,10 @@ def align(gdf: gpd.GeoDataFrame, cs: pd.DataFrame) -> gpd.GeoDataFrame:
     """Une el corte transversal (índice KEYS) con las geometrías, en el mismo orden."""
     data = cs.reset_index().drop(columns=["departamento", "anio"], errors="ignore")
     out = gdf.merge(data, on="codigo_divipola", how="inner").reset_index(drop=True)
-    if len(out) < 20:
-        raise InsufficientDataError(f"Solo {len(out)} departamentos con dato y geometría (mínimo 20).")
+    if len(out) < MIN_SPATIAL_N:
+        raise InsufficientDataError(
+            f"Solo {len(out)} departamentos con dato y geometría (mínimo {MIN_SPATIAL_N})."
+        )
     return out
 
 
@@ -71,6 +74,15 @@ class SpatialFit:
     notes: list[str] = field(default_factory=list)
 
 
+@dataclass
+class SARFit:
+    """Ajuste SAR utilizable para calcular escenarios con derrames espaciales."""
+    model: object
+    rho: float
+    coefs: pd.DataFrame
+    impacts: pd.DataFrame
+
+
 def _coef_table(m, names) -> pd.DataFrame:
     z = np.array(getattr(m, "z_stat", None) or m.t_stat)   # OLS reporta t; ML reporta z
     k = len(names)
@@ -89,6 +101,21 @@ def sar_impacts(beta: pd.Series, rho: float, w) -> pd.DataFrame:
         total = Sk.sum() / n
         rows.append({"Variable": name, "Directo": direct, "Indirecto (derrame)": total - direct, "Total": total})
     return pd.DataFrame(rows).set_index("Variable")
+
+
+def fit_sar(df: gpd.GeoDataFrame, target: str, features: list[str], w) -> SARFit:
+    """Ajusta un SAR explícito para simulación, aunque no sea el modelo recomendado por LM."""
+    y = df[[target]].to_numpy(float)
+    X = df[features].to_numpy(float)
+    names = ["CONSTANTE"] + features
+    model = spreg.ML_Lag(y, X, w=w, name_y=target, name_x=features)
+    rho = float(model.rho)
+    coefs = _coef_table(model, names)
+    coefs.loc["ρ (rezago espacial)"] = [
+        rho, np.ravel(model.std_err)[-1], *np.array(model.z_stat)[-1]
+    ]
+    beta = pd.Series(np.ravel(model.betas)[1:len(names)], index=features)
+    return SARFit(model, rho, coefs, sar_impacts(beta, rho, w))
 
 
 def fit_spatial(df: gpd.GeoDataFrame, target: str, features: list[str], w, alpha: float = .05) -> SpatialFit:
@@ -112,11 +139,9 @@ def fit_spatial(df: gpd.GeoDataFrame, target: str, features: list[str], w, alpha
         rec = "OLS"
     fit = SpatialFit(ols, diag, rec, coefs=_coef_table(ols, names))
     if rec == "SAR":
-        m = spreg.ML_Lag(y, X, w=w, name_y=target, name_x=features)
-        fit.model, fit.rho, fit.coefs = m, float(m.rho), _coef_table(m, names)
-        fit.coefs.loc["ρ (rezago espacial)"] = [m.rho, np.ravel(m.std_err)[-1], *np.array(m.z_stat)[-1]]
-        fit.impacts = sar_impacts(pd.Series(np.ravel(m.betas)[1:len(names)], index=features), fit.rho, w)
-        fit.notes.append(f"SAR: ρ={m.rho:.3f}. Los coeficientes no son efectos marginales; "
+        sar = fit_sar(df, target, features, w)
+        fit.model, fit.rho, fit.coefs, fit.impacts = sar.model, sar.rho, sar.coefs, sar.impacts
+        fit.notes.append(f"SAR: ρ={sar.rho:.3f}. Los coeficientes no son efectos marginales; "
                          "usa la tabla de impactos directos/indirectos.")
     elif rec == "SEM":
         m = spreg.ML_Error(y, X, w=w, name_y=target, name_x=features)
