@@ -197,62 +197,76 @@ def standardize(df: pd.DataFrame, dept: str, year: str, value: str, indicator: s
 
 
 def load_population(quality: list) -> pd.DataFrame:
+    """Lee el anexo DANE por área geográfica y conserva el renglón Total."""
     source = "DANE - proyecciones departamentales de población"
     content = get_bytes(source, POP_XLSX)
     try:
         sheets = pd.read_excel(BytesIO(content), sheet_name=None, header=None, engine="openpyxl")
     except Exception as exc:
         raise source_error(source, POP_XLSX, exc, "revisa el formato del anexo XLSX.") from exc
+
+    # El anexo vigente tiene una tabla larga:
+    # DP, DPNOM, AÑO, ÁREA GEOGRÁFICA, TOTAL.
     for sheet_name, raw in sheets.items():
-        for h in range(min(30, len(raw))):
+        for h in range(min(40, len(raw))):
             header = ["" if pd.isna(x) else str(x).strip() for x in raw.iloc[h]]
-            labels = [norm(x).replace(" ", "") for x in header]
-            dept_i = next((i for i,x in enumerate(labels) if x in
-                           {"departamento","nombredepartamento","dpto","nomdpto"}), None)
-            code_i = next((i for i,x in enumerate(labels) if x in
-                           {"codigodepartamento","coddepartamento","coddpto","codigodane","divipola","codigo"}), None)
-            years = [(i,norm_year(x)) for i,x in enumerate(header)
-                     if norm_year(x) and 1980 <= norm_year(x) <= 2100]
-            if (dept_i is None and code_i is None) or len(years) < 2:
+            labels = [norm(x) for x in header]
+            code_i = next((i for i, x in enumerate(labels) if x == "dp"), None)
+            dept_i = next((i for i, x in enumerate(labels) if x in {"dpnom", "departamento", "nombre departamento"}), None)
+            year_i = next((i for i, x in enumerate(labels) if x in {"ano", "anio", "año"}), None)
+            area_i = next((i for i, x in enumerate(labels) if x in {"area geografica", "area"}), None)
+            value_i = next((i for i, x in enumerate(labels) if x in {"total", "poblacion total", "poblacion"}), None)
+            if None in (code_i, dept_i, year_i, area_i, value_i):
                 continue
-            data = raw.iloc[h+1:].copy()
-            year_i = {i for i,_ in years}
-            other_i = set(range(data.shape[1])) - year_i - {i for i in (dept_i,code_i) if i is not None}
-            for i in other_i:
-                label = labels[i] if i < len(labels) else ""
-                if any(x in label for x in ("area","sexo","edad","total")):
-                    vals = data.iloc[:,i].dropna().astype(str).map(norm)
-                    if vals.str.fullmatch(r"total(?: general| poblacion)?").any():
-                        keep = data.iloc[:,i].astype(str).map(norm).str.fullmatch(r"total(?: general| poblacion)?")
-                        data = data.loc[keep]
+
+            data = raw.iloc[h + 1:].copy()
+            is_total = data.iloc[:, area_i].astype(str).map(norm).eq("total")
+            data = data.loc[is_total]
             rows = []
+            miss_value = miss_geo = miss_year = 0
             for _, row in data.iterrows():
-                name = row.iloc[dept_i] if dept_i is not None else None
-                raw_code = row.iloc[code_i] if code_i is not None else None
-                d, c = norm_dept(name, raw_code)
-                if not d:
-                    continue
-                for i, year in years:
-                    v = to_number(pd.Series([row.iloc[i]])).iloc[0]
-                    if pd.notna(v):
-                        rows.append({"departamento":d,"codigo_divipola":c,"anio":year,"valor":v})
+                dept, code = norm_dept(row.iloc[dept_i], row.iloc[code_i])
+                year = norm_year(row.iloc[year_i])
+                value = to_number(pd.Series([row.iloc[value_i]])).iloc[0]
+                miss_geo += int(dept is None)
+                miss_year += int(year is None)
+                miss_value += int(pd.isna(value))
+                if dept and year and pd.notna(value):
+                    rows.append({
+                        "departamento": dept,
+                        "codigo_divipola": code,
+                        "anio": year,
+                        "valor": float(value),
+                    })
             pop = pd.DataFrame(rows)
             if pop.empty:
                 continue
-            duplicate = pop.duplicated(["codigo_divipola","anio"], keep=False)
+            duplicate = pop.duplicated(["codigo_divipola", "anio"], keep=False)
             if duplicate.any():
-                raise source_error(source, POP_XLSX,
-                    ValueError(f"duplicados en hoja {sheet_name}: {pop.loc[duplicate,['departamento','anio']].drop_duplicates().head().to_dict('records')}"),
-                    "inspecciona dimensiones del XLSX y conserva la fila Total correcta.")
-            quality.append({"Indicador":"Población de referencia","Filas fuente":len(pop),
-                            "Nulos de valor descartados":0,"Geografía no homologada":0,
-                            "Periodo inválido":0,"Filas válidas":len(pop),
-                            "Fuente":f"{source} | {sheet_name}"})
+                examples = pop.loc[
+                    duplicate, ["departamento", "anio"]
+                ].drop_duplicates().head(8).to_dict("records")
+                raise source_error(
+                    source, POP_XLSX,
+                    ValueError(f"duplicados en hoja {sheet_name}: {examples}"),
+                    "revisa las filas Total por departamento y año del anexo.",
+                )
+            quality.append({
+                "Indicador": "Población de referencia",
+                "Filas fuente": len(data),
+                "Nulos de valor descartados": miss_value,
+                "Geografía no homologada": miss_geo,
+                "Periodo inválido": miss_year,
+                "Filas válidas": len(pop),
+                "Fuente": f"{source} | hoja {sheet_name} | área Total",
+            })
             return pop
-    raise source_error(source, POP_XLSX,
-                       ValueError(f"no se reconoció tabla de población; hojas: {list(sheets)}"),
-                       "revisa encabezados de Departamento, DIVIPOLA y años en el anexo.")
 
+    raise source_error(
+        source, POP_XLSX,
+        ValueError(f"no se reconoció la tabla larga DP/DPNOM/AÑO/ÁREA GEOGRÁFICA/TOTAL; hojas: {list(sheets)}"),
+        "revisa encabezados de código, departamento, año, área y población en el anexo DANE.",
+    )
 
 
 def load_gdp(population: pd.DataFrame, quality: list) -> list[pd.DataFrame]:
