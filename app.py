@@ -8,9 +8,12 @@ st.set_page_config(page_title="Observatorio | Nariño", page_icon="🇨🇴", la
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 pages = {
-    "Observatorio": [
-        st.Page("views/panorama.py", title="Panorama", icon="🏠", default=True),
-        st.Page("views/eda.py", title="Análisis exploratorio", icon="📊"),
+    "Inicio": [
+        st.Page("views/home.py", title="Bienvenida", icon="👋", default=True),
+    ],
+    "Explorar": [
+        st.Page("views/panorama.py", title="Explorar datos", icon="🔎"),
+        st.Page("views/eda.py", title="Entender los datos", icon="📊"),
     ],
     "Modelación": [
         st.Page("views/ml.py", title="Machine Learning + SHAP", icon="🤖"),
