@@ -58,6 +58,13 @@ def cross_section(master: pd.DataFrame, indicators: list[str], year: int, min_ro
     return complete(wide, min_rows, f"Corte {year}")
 
 
+def cross_section_coverage(master: pd.DataFrame, indicators: list[str]) -> pd.DataFrame:
+    """Casos completos por año para ayudar a elegir un corte transversal válido."""
+    wide = to_wide(master, indicators)
+    counts = wide.notna().all(axis=1).groupby(level="anio").sum()
+    return counts.rename("Departamentos completos").rename_axis("Año").reset_index()
+
+
 def territory_series(master: pd.DataFrame, indicators: list[str], code: str, min_rows: int = 12) -> Matrix:
     """Serie anual de un territorio (VAR/VECM). Exige años consecutivos."""
     wide = to_wide(master, indicators)
