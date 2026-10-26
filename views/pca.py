@@ -10,7 +10,20 @@ from observatorio.viz import charts, maps
 
 master, quality = state.master()
 ui.header("🧭 Componentes principales y tipologías territoriales",
-          "Reduce indicadores correlacionados a pocos factores, construye un índice sintético y agrupa departamentos.")
+          "Reduce indicadores correlacionados a pocos factores, construye un índice sintético y agrupa departamentos.",
+          "PCA resume varias medidas en pocos componentes y el agrupamiento junta departamentos con perfiles "
+          "parecidos. El índice depende de las variables elegidas y los grupos no son categorías oficiales.")
+
+with st.expander("Cómo leer los resultados"):
+    st.markdown(
+        "- **Componente principal (CP):** combinación de varios indicadores que resume parte de sus diferencias.\n"
+        "- **Varianza explicada:** proporción de las diferencias entre departamentos que recoge cada CP.\n"
+        "- **Carga:** señala qué tan relacionado está un indicador con un componente.\n"
+        "- **Clúster K-means:** grupo de departamentos con perfiles parecidos en los indicadores elegidos.\n"
+        "- **Silueta:** resume qué tan separados están los grupos; valores mayores suelen indicar grupos más definidos.\n"
+        "- El índice 0–100 reescala el primer componente para comparar los departamentos incluidos; "
+        "no es un puntaje oficial ni una medida absoluta de bienestar."
+    )
 
 with st.sidebar:
     ind = ui.pick_indicators(master, key="pca_ind", default_n=5, min_n=3)
@@ -44,7 +57,8 @@ with t1:
 with t2:
     cl = labels.reset_index()[["codigo_divipola", "Clúster"]]
     fig = px.choropleth_map(gdf.merge(cl, on="codigo_divipola"), geojson=maps.to_geojson(gdf),
-                            locations="codigo_divipola", color="Clúster", hover_name="departamento",
+                            featureidkey="properties.codigo_divipola", locations="codigo_divipola",
+                            color="Clúster", hover_name="departamento",
                             map_style="carto-positron", center=maps.CENTER, zoom=4.1, opacity=.8, height=620)
     st.plotly_chart(fig, width="stretch")
     st.caption(f"K-means con k = {labels.nunique()} elegido por silueta máxima ({sil.Silueta.max():.2f}).")

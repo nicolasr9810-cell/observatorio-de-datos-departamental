@@ -6,7 +6,9 @@ import streamlit as st
 from observatorio.ui import components as ui, state
 
 master, quality = state.master()
-ui.header("🧾 Datos y calidad", "Trazabilidad de cada fuente: filas leídas, descartadas y válidas. Sin imputación.")
+ui.header("🧾 Datos y calidad", "Trazabilidad de cada fuente: filas leídas, descartadas y válidas. Sin imputación.",
+          "Esta vista muestra de dónde vienen los datos y cuántos registros se pudieron usar. "
+          "Los faltantes no se rellenan con ceros.")
 st.dataframe(quality, width="stretch", hide_index=True)
 st.subheader("Contrato largo (master)")
 st.dataframe(master, width="stretch", hide_index=True)

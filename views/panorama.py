@@ -64,20 +64,32 @@ master, quality = state.master()
 st.title("🇨🇴 Observatorio Socioeconómico y de Competitividad")
 st.subheader("Colombia con énfasis analítico en Nariño")
 st.caption("Fuentes oficiales/públicas, sin datos sintéticos. La cobertura varía por indicador.")
+st.info(
+    "**Explora los datos:** elige una dimensión, un indicador, los departamentos y los años en el panel lateral. "
+    "Después puedes consultar su tendencia, mapa, ranking y tabla descargable."
+)
 
 with st.sidebar:
-    st.header("Explorar")
-    mode = st.radio("Filtro de enfoque",["Vista Nacional General","Vista de Análisis Profundo: Nariño"],index=1)
+    st.header("Ajusta tu exploración")
+    mode = st.radio(
+        "Enfoque", ["Vista Nacional General", "Vista de Análisis Profundo: Nariño"], index=1,
+        help="La vista de Nariño sugiere compararlo con Cauca, Valle del Cauca y Putumayo.",
+    )
     categories = sorted(master.categoria.unique())
-    category = st.selectbox("Dimensión",categories)
+    category = st.selectbox("Dimensión", categories, help="Área temática del indicador.")
     cat = master[master.categoria==category]
-    indicator = st.selectbox("Indicador",sorted(cat.indicador.unique()))
+    indicator = st.selectbox(
+        "Indicador", sorted(cat.indicador.unique()),
+        help="Una medida concreta. La unidad y el año aparecen en los gráficos.",
+    )
     depts = sorted(master.departamento.unique())
     defaults = [d for d in ["Nariño","Cauca","Valle del Cauca","Putumayo"] if d in depts] if mode.endswith("Nariño") else depts
-    chosen_depts = st.multiselect("Departamentos",depts,default=defaults)
+    chosen_depts = st.multiselect("Departamentos", depts, default=defaults,
+                                  help="Elige uno o varios territorios para compararlos.")
     years = sorted(master.loc[master.indicador==indicator,"anio"].unique())
     ymin,ymax = int(min(years)),int(max(years))
-    period = st.slider("Rango de años",ymin,ymax,(ymin,ymax)) if ymin<ymax else (ymin,ymax)
+    period = st.slider("Rango de años", ymin, ymax, (ymin, ymax),
+                       help="Los años dependen de la cobertura disponible para este indicador.") if ymin<ymax else (ymin,ymax)
 
 view = master[(master.categoria==category)&(master.indicador==indicator)&master.anio.between(*period)]
 if chosen_depts:

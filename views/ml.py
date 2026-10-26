@@ -12,7 +12,20 @@ from observatorio.viz import charts
 
 master, quality = state.master()
 ui.header("🤖 Machine Learning e interpretabilidad",
-          "Ridge, Lasso, SVR (SVM) y red neuronal MLP sobre el panel departamento × año, explicados con SHAP.")
+          "Ridge, Lasso, SVR (SVM) y red neuronal MLP sobre el panel departamento × año, explicados con SHAP.",
+          "El modelo aprende patrones para estimar un indicador a partir de otros. SHAP ayuda a ver "
+          "qué variables empujan una predicción hacia arriba o abajo; no identifica efectos causales.")
+
+with st.expander("¿Qué son estos modelos?"):
+    st.markdown(
+        "- **Ridge:** estima relaciones y reduce el peso de variables muy parecidas entre sí.\n"
+        "- **Lasso:** también reduce pesos y puede dejar en cero variables con poca información adicional.\n"
+        "- **SVR (SVM):** encuentra una relación que puede ser curva, no solo una línea recta.\n"
+        "- **MLP:** una red neuronal pequeña que combina variables para reconocer patrones más complejos.\n"
+        "- **SHAP:** reparte cada predicción entre las variables que más la suben o la bajan.\n"
+        "- **Validación fuera de muestra:** prueba el modelo en datos que no usó para aprender; sirve para "
+        "medir qué tan bien generaliza."
+    )
 
 with st.sidebar:
     ind = ui.pick_indicators(master, "Variables del panel", key="ml_ind", default_n=5, min_n=3)

@@ -10,7 +10,22 @@ from observatorio.viz import charts
 
 master, quality = state.master()
 ui.header("📈 VAR y VECM", "Estacionariedad (ADF/KPSS) → cointegración de Johansen → VAR o VECM, "
-          "con causalidad de Granger, impulso-respuesta y pronóstico.")
+          "con causalidad de Granger, impulso-respuesta y pronóstico.",
+          "Sigue cómo varios indicadores de un territorio cambian juntos con los años. Un choque muestra "
+          "una trayectoria estimada por el modelo; con series cortas no debe leerse como una predicción segura.")
+
+with st.expander("Glosario de series de tiempo"):
+    st.markdown(
+        "- **Estacionariedad (ADF/KPSS):** revisa si una serie mantiene un comportamiento estadístico estable "
+        "o si sigue una tendencia.\n"
+        "- **Cointegración de Johansen:** busca si varias series con tendencia comparten una relación de largo plazo.\n"
+        "- **VAR/VECM:** modelos que describen cómo varios indicadores se anticipan y responden entre sí; VECM "
+        "incluye una relación de largo plazo cuando hay cointegración.\n"
+        "- **Granger:** prueba si los valores pasados de una variable ayudan a anticipar otra; no prueba causalidad.\n"
+        "- **Impulso-respuesta:** muestra la trayectoria estimada después de un cambio inesperado en una variable.\n"
+        "- **Pronóstico e intervalo:** el pronóstico es una continuación estimada; el intervalo muestra un rango "
+        "de incertidumbre alrededor de ella."
+    )
 
 with st.sidebar:
     code = st.selectbox("Territorio", sorted(DIVIPOLA), index=sorted(DIVIPOLA).index(NARINO),
