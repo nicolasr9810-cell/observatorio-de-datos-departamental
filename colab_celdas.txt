@@ -1,0 +1,78 @@
+OBSERVATORIO SOCIOECONÓMICO - EJECUCIÓN EN GOOGLE COLAB
+=========================================================
+
+Antes de iniciar
+----------------
+Carga los archivos app.py y requirements.txt en el notebook de Colab.
+README.md explica las fuentes y el despliegue posterior en Streamlit Community Cloud.
+
+CELDA 1 - SUBIR ARCHIVOS DESDE EL COMPUTADOR
+
+from google.colab import files
+uploaded = files.upload()
+
+En el cuadro selecciona app.py y requirements.txt.
+
+CELDA 2 - INSTALAR DEPENDENCIAS
+
+!pip -q install -r requirements.txt pyngrok
+
+CELDA 3 - CONFIGURAR NGROK
+
+En el panel lateral de Colab abre Secrets (icono de llave) y crea:
+  Nombre: NGROK_AUTHTOKEN
+  Valor: tu token privado de ngrok
+
+Habilita el acceso del notebook al secreto. No guardes el token en una celda,
+un archivo ni en GitHub.
+
+CELDA 4 - INICIAR STREAMLIT Y ABRIR EL TÚNEL
+
+import subprocess
+import time
+from pathlib import Path
+from google.colab import userdata
+from pyngrok import ngrok
+
+token = userdata.get("NGROK_AUTHTOKEN")
+if not token:
+    raise RuntimeError(
+        "Falta NGROK_AUTHTOKEN. Agrégalo en Colab Secrets y habilita su acceso."
+    )
+
+ngrok.set_auth_token(token)
+log_path = Path("/content/streamlit.log")
+log_file = log_path.open("w")
+process = subprocess.Popen(
+    [
+        "streamlit", "run", "/content/app.py",
+        "--server.port", "8501",
+        "--server.address", "0.0.0.0",
+        "--server.headless", "true",
+    ],
+    stdout=log_file,
+    stderr=subprocess.STDOUT,
+)
+time.sleep(8)
+
+if process.poll() is not None:
+    log_file.flush()
+    raise RuntimeError(
+        "Streamlit se detuvo al iniciar. Revisa /content/streamlit.log: "
+        + log_path.read_text(errors="replace")[-5000:]
+    )
+
+public_url = ngrok.connect(8501, "http").public_url
+print("URL temporal del Observatorio:", public_url)
+
+CELDA 5 - CERRAR TÚNEL (OPCIONAL)
+
+ngrok.disconnect(public_url)
+process.terminate()
+log_file.close()
+
+Notas
+-----
+La URL es temporal mientras el runtime de Colab siga activo.
+Si una fuente activa falla o cambia de esquema, Streamlit muestra el error
+técnico y se detiene; no crea datos alternativos.
