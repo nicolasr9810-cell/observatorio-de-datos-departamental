@@ -6,6 +6,7 @@ from pathlib import Path
 
 import geopandas as gpd
 from shapely.ops import unary_union
+from shapely.validation import make_valid
 
 from observatorio.config import DIVIPOLA, GEO_LOCAL, GEO_QUERY, GEO_QUERY_FALLBACK
 from observatorio.core.http import DataSourceError, get_json, source_error
@@ -36,7 +37,7 @@ def polygonal_geometry(geometry):
     """
     if geometry is None or not hasattr(geometry, "geom_type") or geometry.is_empty:
         return None
-    valid = geometry if geometry.is_valid else geometry.make_valid()
+    valid = geometry if geometry.is_valid else make_valid(geometry)
     parts = _polygon_parts(valid)
     if not parts:
         return None
