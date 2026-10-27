@@ -7,11 +7,11 @@ from pathlib import Path
 import geopandas as gpd
 from shapely.ops import unary_union
 
-from observatorio.config import DIVIPOLA, GEO_LOCAL, GEO_QUERY
-from observatorio.core.http import get_json, source_error
+from observatorio.config import DIVIPOLA, GEO_LOCAL, GEO_QUERY, GEO_QUERY_FALLBACK
+from observatorio.core.http import DataSourceError, get_json, source_error
 from observatorio.core.normalize import norm_code
 
-SOURCE = "DANE Geoportal - capa de límites departamentales"
+SOURCE = "DANE MGN - capa de límites departamentales"
 
 
 def _polygon_parts(geometry) -> list:
@@ -59,16 +59,35 @@ def load_departments() -> gpd.GeoDataFrame:
             raise source_error(SOURCE, str(local), ValueError(f"sin columna de código: {list(gdf.columns)}"),
                                "el GeoJSON debe traer DPTO_CCDGO o equivalente.")
     else:
-        payload = get_json(SOURCE, GEO_QUERY, {
+        params = {
             "where": "1=1", "outFields": "DPTO_CCDGO,DPTO_CNMBR", "returnGeometry": "true",
             "outSR": "4326", "f": "geojson",
-        })
+        }
+        payload = None
+        failures = []
+        endpoint_used = GEO_QUERY
+        for endpoint in (GEO_QUERY, GEO_QUERY_FALLBACK):
+            try:
+                payload = get_json(SOURCE, endpoint, params)
+                endpoint_used = endpoint
+                break
+            except DataSourceError as exc:
+                failures.append(str(exc))
+        if payload is None:
+            raise source_error(
+                SOURCE, " ; ".join((GEO_QUERY, GEO_QUERY_FALLBACK)),
+                ConnectionError("Fallaron la fuente primaria y el respaldo: " + " | ".join(failures)),
+                "revisa conectividad saliente desde Streamlit Cloud; como alternativa, coloca los límites DANE en data/departamentos.geojson.",
+            )
         feats = payload.get("features") if isinstance(payload, dict) else None
         if not feats:
-            raise source_error(SOURCE, GEO_QUERY, ValueError("GeoJSON sin entidades"),
+            raise source_error(SOURCE, endpoint_used, ValueError("GeoJSON sin entidades"),
                                "revisa que la capa acepte f=geojson o descarga el MGN a data/departamentos.geojson.")
         gdf = gpd.GeoDataFrame.from_features(feats, crs="EPSG:4326")
-        code_col = "DPTO_CCDGO"
+        code_col = next((c for c in gdf.columns if c.upper() in {"DPTO_CCDGO", "DPTO", "COD_DPTO"}), None)
+        if code_col is None:
+            raise source_error(SOURCE, endpoint_used, ValueError(f"sin columna de código: {list(gdf.columns)}"),
+                               "la capa debe incluir el código DIVIPOLA de dos dígitos.")
     gdf["codigo_divipola"] = gdf[code_col].map(norm_code)
     gdf = gdf.dropna(subset=["codigo_divipola"]).dissolve(by="codigo_divipola", as_index=False)
     gdf["departamento"] = gdf["codigo_divipola"].map(DIVIPOLA)
@@ -76,14 +95,15 @@ def load_departments() -> gpd.GeoDataFrame:
     unusable = polygonal.map(lambda geom: geom is None or geom.is_empty)
     if unusable.any():
         codes = gdf.loc[unusable, "codigo_divipola"].tolist()
-        endpoint = str(local) if local.exists() else GEO_QUERY
+        endpoint = str(local) if local.exists() else endpoint_used
         raise source_error(
             SOURCE, endpoint, ValueError(f"geometrías sin polígonos válidos para DIVIPOLA: {codes}"),
             "vuelve a descargar los límites departamentales; cada departamento debe tener un Polygon o MultiPolygon.",
         )
     gdf = gdf.set_geometry(polygonal)
     if len(gdf) < 30:
-        raise source_error(SOURCE, GEO_QUERY, ValueError(f"solo {len(gdf)} departamentos con geometría"),
+        raise source_error(SOURCE, str(local) if local.exists() else endpoint_used,
+                           ValueError(f"solo {len(gdf)} departamentos con geometría"),
                            "verifica la capa; se esperan 33 entidades (32 + Bogotá).")
     return gdf[["codigo_divipola", "departamento", "geometry"]].sort_values("codigo_divipola").reset_index(drop=True)
 
