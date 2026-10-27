@@ -12,9 +12,12 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import spreg
+from scipy.optimize import minimize_scalar
+from scipy.stats import norm
 from esda.moran import Moran, Moran_Local
 from libpysal.weights import KNN, Queen
 from libpysal.weights.util import attach_islands
+from types import SimpleNamespace
 
 from observatorio.core.http import InsufficientDataError
 from observatorio.data.geo import polygonal_geometry
@@ -96,6 +99,7 @@ class SARFit:
     rho: float
     coefs: pd.DataFrame
     impacts: pd.DataFrame
+    notes: list[str] = field(default_factory=list)
 
 
 def _coef_table(m, names) -> pd.DataFrame:
@@ -118,19 +122,122 @@ def sar_impacts(beta: pd.Series, rho: float, w) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("Variable")
 
 
+def _sar_coefs_original_scale(beta_std, rho, covariance, x_mean, x_scale, y_mean, y_scale, names):
+    """Convierte parámetros y covarianza del SAR estandarizado a las unidades originales."""
+    n_features = len(x_mean)
+    p = n_features + 1
+    beta_std = np.asarray(beta_std, dtype=float).reshape(-1)
+    beta = beta_std[1:p] * y_scale / x_scale
+    intercept = (1.0 - rho) * y_mean + y_scale * beta_std[0] - float(x_mean @ beta)
+    values = np.r_[intercept, beta, rho]
+
+    transform = np.zeros((p + 1, p + 1), dtype=float)
+    transform[0, 0] = y_scale
+    transform[0, 1:p] = -x_mean * y_scale / x_scale
+    transform[0, p] = -y_mean
+    for j in range(n_features):
+        transform[j + 1, j + 1] = y_scale / x_scale[j]
+    transform[p, p] = 1.0
+    cov = transform @ np.asarray(covariance, dtype=float) @ transform.T
+    errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
+    z = np.divide(values, errors, out=np.full_like(values, np.nan), where=errors > 0)
+    p_values = 2.0 * norm.sf(np.abs(z))
+    return pd.DataFrame(
+        {"Coeficiente": values, "Error est.": errors, "z": z, "p": p_values},
+        index=[*names, "ρ (rezago espacial)"],
+    ), beta
+
+
+def _fit_sar_profile(y, x, w, target, features, x_mean, x_scale, y_mean, y_scale):
+    """Fallback SAR por máxima verosimilitud perfilada y solución matricial exacta.
+
+    Evita la serie geométrica de PySAL cuando rho queda demasiado cerca del límite
+    de convergencia. El análisis se restringe a |rho| < 0.95, donde la serie es estable.
+    """
+    n = len(y)
+    W = np.asarray(w.full()[0], dtype=float)
+    y_std = (y - y_mean) / y_scale
+    x_std = (x - x_mean) / x_scale
+    X = np.column_stack((np.ones(n), x_std))
+    Wy = W @ y_std
+    identity = np.eye(n)
+
+    def profile(rho):
+        A = identity - rho * W
+        sign, logdet = np.linalg.slogdet(A)
+        if sign <= 0 or not np.isfinite(logdet):
+            return np.inf
+        transformed_y = y_std - rho * Wy
+        beta = np.linalg.lstsq(X, transformed_y, rcond=None)[0]
+        residual = transformed_y - X @ beta
+        sigma2 = float(residual.T @ residual) / n
+        if not np.isfinite(sigma2) or sigma2 <= 0:
+            return np.inf
+        return 0.5 * n * np.log(sigma2) - logdet
+
+    optimum = minimize_scalar(profile, bounds=(-0.95, 0.95), method="bounded", options={"xatol": 1e-6})
+    rho = float(optimum.x)
+    if not optimum.success or not np.isfinite(optimum.fun) or abs(rho) >= 0.94:
+        raise ValueError(
+            "El SAR no identifica un ρ estable dentro de (-0.95, 0.95). "
+            "Usa otro escenario o cambia los indicadores seleccionados."
+        )
+
+    transformed_y = y_std - rho * Wy
+    beta_std = np.linalg.lstsq(X, transformed_y, rcond=None)[0]
+    residual = transformed_y - X @ beta_std
+    sigma2 = float(residual.T @ residual) / n
+    cov_std = sigma2 * np.linalg.inv(X.T @ X)
+    conditional_cov = np.zeros((len(beta_std) + 1, len(beta_std) + 1), dtype=float)
+    conditional_cov[:-1, :-1] = cov_std
+    h = 1e-4
+    curvature = (profile(rho + h) - 2 * profile(rho) + profile(rho - h)) / (h * h)
+    if curvature > 0 and np.isfinite(curvature):
+        conditional_cov[-1, -1] = 1.0 / curvature
+
+    table, beta = _sar_coefs_original_scale(
+        beta_std, rho, conditional_cov, x_mean, x_scale, y_mean, y_scale,
+        ["CONSTANTE", *features],
+    )
+    model = SimpleNamespace(rho=rho, betas=np.r_[table["Coeficiente"].iloc[:-1], rho], method="profile exacto")
+    impacts = sar_impacts(pd.Series(beta, index=features), rho, w)
+    notes = [
+        "La expansión de PySAL no convergió; el SAR se estimó con máxima verosimilitud perfilada y solución matricial exacta.",
+        "Los errores estándar de β se calculan condicionados a ρ y deben leerse como aproximados.",
+    ]
+    return SARFit(model, rho, table, impacts, notes)
+
+
 def fit_sar(df: gpd.GeoDataFrame, target: str, features: list[str], w) -> SARFit:
     """Ajusta un SAR explícito para simulación, aunque no sea el modelo recomendado por LM."""
     y = df[[target]].to_numpy(float)
-    X = df[features].to_numpy(float)
-    names = ["CONSTANTE"] + features
-    model = spreg.ML_Lag(y, X, w=w, name_y=target, name_x=features)
+    x = df[features].to_numpy(float)
+    y_mean = float(y.mean())
+    y_scale = float(y.std())
+    x_mean = x.mean(axis=0)
+    x_scale = x.std(axis=0)
+    if not np.isfinite(y_scale) or y_scale <= 0 or not np.isfinite(x_scale).all() or (x_scale <= 0).any():
+        raise ValueError("El SAR necesita variación en Y y en cada indicador explicativo (X).")
+
+    y_std = (y - y_mean) / y_scale
+    x_std = (x - x_mean) / x_scale
+    try:
+        model = spreg.ML_Lag(
+            y_std, x_std, w=w, name_y=target, name_x=features,
+            epsilon=1e-5, spat_impacts=None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        if "power expansion will not converge" not in str(exc).lower():
+            raise
+        return _fit_sar_profile(y, x, w, target, features, x_mean, x_scale, y_mean, y_scale)
+
     rho = float(model.rho)
-    coefs = _coef_table(model, names)
-    coefs.loc["ρ (rezago espacial)"] = [
-        rho, np.ravel(model.std_err)[-1], *np.array(model.z_stat)[-1]
-    ]
-    beta = pd.Series(np.ravel(model.betas)[1:len(names)], index=features)
-    return SARFit(model, rho, coefs, sar_impacts(beta, rho, w))
+    coefs, beta = _sar_coefs_original_scale(
+        np.ravel(model.betas)[:-1], rho, model.vm, x_mean, x_scale, y_mean, y_scale,
+        ["CONSTANTE", *features],
+    )
+    return SARFit(model, rho, coefs, sar_impacts(pd.Series(beta, index=features), rho, w),
+                  ["Y y X se estandarizan internamente para mejorar la estabilidad numérica; la tabla se expresa en unidades originales."])
 
 
 def fit_spatial(df: gpd.GeoDataFrame, target: str, features: list[str], w, alpha: float = .05) -> SpatialFit:
@@ -156,6 +263,7 @@ def fit_spatial(df: gpd.GeoDataFrame, target: str, features: list[str], w, alpha
     if rec == "SAR":
         sar = fit_sar(df, target, features, w)
         fit.model, fit.rho, fit.coefs, fit.impacts = sar.model, sar.rho, sar.coefs, sar.impacts
+        fit.notes.extend(sar.notes)
         fit.notes.append(f"SAR: ρ={sar.rho:.3f}. Los coeficientes no son efectos marginales; "
                          "usa la tabla de impactos directos/indirectos.")
     elif rec == "SEM":
