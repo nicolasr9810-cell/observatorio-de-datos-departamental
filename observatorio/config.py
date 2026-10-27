@@ -31,7 +31,12 @@ ALIASES = {
     "valle":"Valle del Cauca",
 }
 
-# Geometrías departamentales (mismo servicio DANE de pobreza, con geometría).
-GEO_QUERY = POVERTY
+# Límites administrativos: capa DANE "Departamentos" (ID 1), no la capa temática
+# de pobreza (ID 2). La capa 1 publica geometrías polygonales para los 33 territorios.
+GEO_QUERY = (
+    "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/"
+    "Serv_Deptos_Pobreza_2012_2020/MapServer/1/query"
+)
+GEO_CACHE_VERSION = "dane-departamentos-layer-1-v1"
 GEO_LOCAL = "data/departamentos.geojson"   # opcional: MGN DANE descargado a mano
 NARINO = "52"
