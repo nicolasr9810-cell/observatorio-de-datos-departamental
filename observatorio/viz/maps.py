@@ -13,6 +13,16 @@ from observatorio.data.geo import to_geojson
 CENTER = {"lat": 4.3, "lon": -73.5}
 LISA_COLORS = {"Alto-Alto": "#d7191c", "Bajo-Bajo": "#2c7bb6", "Alto-Bajo": "#fdae61",
                "Bajo-Alto": "#abd9e9", "No significativo": "#e6e6e6"}
+MAP_SIMPLIFY_TOLERANCE = 0.005  # grados; solo para dibujar, nunca para calcular vecinos.
+
+
+def _map_geometries(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Reduce vértices del GeoJSON de pantalla; conserva el original para econometría."""
+    simplified = gdf.copy()
+    simplified = simplified.set_geometry(
+        simplified.geometry.simplify(MAP_SIMPLIFY_TOLERANCE, preserve_topology=True)
+    )
+    return simplified
 
 
 def _highlight(fig: go.Figure, gdf: gpd.GeoDataFrame, code: str = NARINO) -> go.Figure:
@@ -37,6 +47,8 @@ def choropleth(gdf: gpd.GeoDataFrame, values: pd.DataFrame, value_col: str, titl
                unit: str = "", scale: str = "Viridis", diverging: bool = False, height: int = 620,
                highlight: str | None = NARINO) -> go.Figure:
     """values: DataFrame con 'codigo_divipola' y value_col. Departamentos sin dato quedan en gris."""
+    map_gdf = _map_geometries(gdf)
+    geojson = to_geojson(map_gdf)
     data = gdf[["codigo_divipola", "departamento"]].merge(values[["codigo_divipola", value_col]],
                                                           on="codigo_divipola", how="left")
     kw = {}
@@ -45,32 +57,33 @@ def choropleth(gdf: gpd.GeoDataFrame, values: pd.DataFrame, value_col: str, titl
         kw = {"color_continuous_scale": "RdBu_r", "range_color": (-m, m)}
     else:
         kw = {"color_continuous_scale": scale}
-    fig = px.choropleth_map(data, geojson=to_geojson(gdf), featureidkey="properties.codigo_divipola",
+    fig = px.choropleth_map(data, geojson=geojson, featureidkey="properties.codigo_divipola",
                             locations="codigo_divipola", color=value_col,
                             hover_name="departamento", hover_data={"codigo_divipola": False, value_col: ":,.3f"},
                             opacity=.8, labels={value_col: unit or value_col}, **kw)
     missing = data[data[value_col].isna()]
     if not missing.empty:
-        fig.add_trace(go.Choroplethmap(geojson=to_geojson(gdf), featureidkey="properties.codigo_divipola",
+        fig.add_trace(go.Choroplethmap(geojson=geojson, featureidkey="properties.codigo_divipola",
                                        locations=missing.codigo_divipola,
                                        z=[0] * len(missing), colorscale=[[0, "#cccccc"], [1, "#cccccc"]],
                                        showscale=False, text=missing.departamento,
                                        hovertemplate="%{text}: sin dato<extra></extra>"))
     if highlight:
-        _highlight(fig, gdf, highlight)
+        _highlight(fig, map_gdf, highlight)
     return _layout(fig, title, height)
 
 
 def lisa_map(gdf: gpd.GeoDataFrame, lisa: pd.DataFrame, title: str = "Clústeres LISA", height: int = 620) -> go.Figure:
     """gdf y lisa en el mismo orden (salida de spatial.align + spatial.local_moran)."""
+    map_gdf = _map_geometries(gdf)
     data = gdf[["codigo_divipola", "departamento"]].assign(Cuadrante=lisa["Cuadrante"].values,
                                                            p=lisa["p"].values)
-    fig = px.choropleth_map(data, geojson=to_geojson(gdf), featureidkey="properties.codigo_divipola",
+    fig = px.choropleth_map(data, geojson=to_geojson(map_gdf), featureidkey="properties.codigo_divipola",
                             locations="codigo_divipola", color="Cuadrante",
                             color_discrete_map=LISA_COLORS, hover_name="departamento",
                             hover_data={"codigo_divipola": False, "p": ":.3f"}, opacity=.85,
                             category_orders={"Cuadrante": list(LISA_COLORS)})
-    _highlight(fig, gdf)
+    _highlight(fig, map_gdf)
     return _layout(fig, title, height)
 
 
