@@ -31,12 +31,16 @@ ALIASES = {
     "valle":"Valle del Cauca",
 }
 
-# Límites administrativos: capa DANE "Departamentos" (ID 1), no la capa temática
-# de pobreza (ID 2). La capa 1 publica geometrías polygonales para los 33 territorios.
+# Límites administrativos DANE MGN, servidos por el espejo ArcGIS Colombia.
+# Esta capa evita depender del host del Geoportal que puede no responder desde Streamlit Cloud.
 GEO_QUERY = (
+    "https://ags.esri.co/arcgis/rest/services/DatosAbiertos/MGN_Departamentos/"
+    "MapServer/0/query"
+)
+GEO_QUERY_FALLBACK = (
     "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/"
     "Serv_Deptos_Pobreza_2012_2020/MapServer/1/query"
 )
-GEO_CACHE_VERSION = "dane-departamentos-layer-1-v1"
+GEO_CACHE_VERSION = "dane-mgn-esri-mirror-v2"
 GEO_LOCAL = "data/departamentos.geojson"   # opcional: MGN DANE descargado a mano
 NARINO = "52"
