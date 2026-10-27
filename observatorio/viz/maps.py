@@ -25,6 +25,11 @@ def _map_geometries(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return simplified
 
 
+def map_geojson(gdf: gpd.GeoDataFrame) -> dict:
+    """GeoJSON simplificado para mostrar; los análisis conservan la geometría completa."""
+    return to_geojson(_map_geometries(gdf))
+
+
 def _highlight(fig: go.Figure, gdf: gpd.GeoDataFrame, code: str = NARINO) -> go.Figure:
     """Contorno grueso del departamento foco (Nariño por defecto)."""
     sel = gdf[gdf.codigo_divipola == code]
