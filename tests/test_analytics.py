@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from shapely.geometry import GeometryCollection, LineString, Point
 
 from observatorio.analytics import dimred, eda, explain, ml, policy, spatial, timeseries
 from observatorio.core import panel
@@ -106,6 +107,23 @@ def test_spatial(master, grid):
     sim = policy.spatial_policy(gdf, w, 0.4, -0.8, 1.0, ["52"])
     assert (sim["Tipo"] == "Intervenido").sum() == 1 and (sim["Tipo"] == "Derrame").any()
     assert len(spatial.build_weights(gdf, "KNN", 4).neighbors) == len(gdf)
+
+
+def test_spatial_weights_repair_mixed_geometry(grid):
+    mixed = grid.copy()
+    polygon = mixed.geometry.iloc[0]
+    line = LineString([(-76.0, 1.0), (-75.9, 1.1)])
+    mixed.at[0, "geometry"] = GeometryCollection([polygon, line])
+    w = spatial.build_weights(mixed)
+    assert w.n == len(mixed)
+    assert not w.islands
+
+
+def test_spatial_weights_explain_nonpolygon_geometry(grid):
+    points = grid.copy()
+    points.at[0, "geometry"] = Point(-76.0, 1.0)
+    with pytest.raises(ValueError, match="Polygon o MultiPolygon válido"):
+        spatial.build_weights(points)
 
 
 def test_map_geojson_joins_by_department_code(grid):
