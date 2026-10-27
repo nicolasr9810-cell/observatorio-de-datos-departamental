@@ -50,6 +50,10 @@ def dropped(m: panel.Matrix):
         st.caption(f"Casos completos: {len(m.data)} · descartados por faltantes: {m.dropped} (sin imputación).")
 
 
+def map_loading_note():
+    st.caption("Los mapas pueden tardar un poco en cargar, especialmente la primera vez.")
+
+
 def download(df: pd.DataFrame, name: str, label: str = "Descargar CSV"):
     st.download_button(label, df.to_csv().encode("utf-8-sig"), f"{name}.csv", "text/csv", key=f"dl_{name}")
 
