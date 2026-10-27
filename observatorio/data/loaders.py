@@ -2,6 +2,7 @@
 """Conectores de fuentes activas (migrados sin cambios desde app.py)."""
 from __future__ import annotations
 
+import logging
 import re
 from io import BytesIO
 
@@ -198,32 +199,46 @@ def load_poverty_gini(quality: list) -> list[pd.DataFrame]:
     ]
     result = []
     for endpoint,source,pattern,indicator,unit,public_url in specs:
-        payload = get_json(source,endpoint,{
-            "where":"1=1","outFields":"*","returnGeometry":"false","f":"json"
-        })
-        features = payload.get("features") if isinstance(payload,dict) else None
-        if not features:
-            raise source_error(source,endpoint,ValueError("ArcGIS devolvió cero entidades"),
-                               "revisa disponibilidad del servicio y el ID de capa.")
-        records = []
-        for feature in features:
-            attrs = feature.get("attributes",{})
-            dept,code = norm_dept(attrs.get("DPTO_CNMBR"),attrs.get("DPTO_CCDGO"))
-            if not dept:
-                continue
-            for field,value in attrs.items():
-                match = re.match(pattern,str(field),flags=re.I)
-                if match:
-                    records.append({"departamento":dept,"codigo_divipola":code,
-                                    "anio":int(match.group(1)),"valor":value})
-        if not records:
-            raise source_error(source,endpoint,ValueError("no hay campos anuales esperados"),
-                               "inspecciona los campos ArcGIS y actualiza el patrón.")
-        result.append(standardize(
-            pd.DataFrame(records),"departamento","anio","valor",indicator,
-            "Pobreza y desigualdad",unit,source,public_url,
-            code="codigo_divipola",quality=quality,
-        ))
+        source_quality = []
+        try:
+            payload = get_json(source,endpoint,{
+                "where":"1=1","outFields":"*","returnGeometry":"false","f":"json"
+            })
+            features = payload.get("features") if isinstance(payload,dict) else None
+            if not features:
+                raise source_error(source,endpoint,ValueError("ArcGIS devolvió cero entidades"),
+                                   "revisa disponibilidad del servicio y el ID de capa.")
+            records = []
+            for feature in features:
+                attrs = feature.get("attributes",{})
+                dept,code = norm_dept(attrs.get("DPTO_CNMBR"),attrs.get("DPTO_CCDGO"))
+                if not dept:
+                    continue
+                for field,value in attrs.items():
+                    match = re.match(pattern,str(field),flags=re.I)
+                    if match:
+                        records.append({"departamento":dept,"codigo_divipola":code,
+                                        "anio":int(match.group(1)),"valor":value})
+            if not records:
+                raise source_error(source,endpoint,ValueError("no hay campos anuales esperados"),
+                                   "inspecciona los campos ArcGIS y actualiza el patrón.")
+            frame = standardize(
+                pd.DataFrame(records),"departamento","anio","valor",indicator,
+                "Pobreza y desigualdad",unit,source,public_url,
+                code="codigo_divipola",quality=source_quality,
+            )
+        except Exception as exc:  # Aísla cada servicio DANE para que Gini u otros datos sigan cargando.
+            logging.warning("No se pudo cargar %s: %s", source, exc)
+            quality.append({
+                "Indicador": indicator,
+                "Estado": "No disponible",
+                "Filas válidas": 0,
+                "Detalle": "No se pudo consultar en esta carga. Revisa la conexión e inténtalo de nuevo.",
+                "Fuente": source,
+            })
+            continue
+        quality.extend(source_quality)
+        result.append(frame)
     return result
 
 
