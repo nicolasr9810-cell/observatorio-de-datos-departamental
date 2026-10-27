@@ -5,12 +5,43 @@ from __future__ import annotations
 from pathlib import Path
 
 import geopandas as gpd
+from shapely.ops import unary_union
 
 from observatorio.config import DIVIPOLA, GEO_LOCAL, GEO_QUERY
 from observatorio.core.http import get_json, source_error
 from observatorio.core.normalize import norm_code
 
 SOURCE = "DANE geoportal - límites departamentales (servicio de pobreza 2012-2020)"
+
+
+def _polygon_parts(geometry) -> list:
+    """Extrae polígonos de geometrías mixtas; líneas y puntos no definen áreas."""
+    if geometry is None or not hasattr(geometry, "geom_type") or geometry.is_empty:
+        return []
+    kind = geometry.geom_type
+    if kind == "Polygon":
+        return [geometry]
+    if kind == "MultiPolygon":
+        return list(geometry.geoms)
+    if kind == "GeometryCollection":
+        return [part for child in geometry.geoms for part in _polygon_parts(child)]
+    return []
+
+
+def polygonal_geometry(geometry):
+    """Devuelve Polygon/MultiPolygon válido o None si no hay un área utilizable.
+
+    make_valid puede devolver una GeometryCollection con polígonos y líneas.
+    Libpysal requiere geometrías poligonales para pesos de contigüidad.
+    """
+    if geometry is None or not hasattr(geometry, "geom_type") or geometry.is_empty:
+        return None
+    valid = geometry if geometry.is_valid else geometry.make_valid()
+    parts = _polygon_parts(valid)
+    if not parts:
+        return None
+    merged = unary_union(parts)
+    return merged if merged.geom_type in {"Polygon", "MultiPolygon"} and not merged.is_empty else None
 
 
 def load_departments(simplify_deg: float = 0.01) -> gpd.GeoDataFrame:
@@ -40,7 +71,16 @@ def load_departments(simplify_deg: float = 0.01) -> gpd.GeoDataFrame:
     gdf["codigo_divipola"] = gdf[code_col].map(norm_code)
     gdf = gdf.dropna(subset=["codigo_divipola"]).dissolve(by="codigo_divipola", as_index=False)
     gdf["departamento"] = gdf["codigo_divipola"].map(DIVIPOLA)
-    gdf["geometry"] = gdf.geometry.make_valid()
+    polygonal = gdf.geometry.map(polygonal_geometry)
+    unusable = polygonal.map(lambda geom: geom is None or geom.is_empty)
+    if unusable.any():
+        codes = gdf.loc[unusable, "codigo_divipola"].tolist()
+        endpoint = str(local) if local.exists() else GEO_QUERY
+        raise source_error(
+            SOURCE, endpoint, ValueError(f"geometrías sin polígonos válidos para DIVIPOLA: {codes}"),
+            "vuelve a descargar los límites departamentales; cada departamento debe tener un Polygon o MultiPolygon.",
+        )
+    gdf = gdf.set_geometry(polygonal)
     if len(gdf) < 30:
         raise source_error(SOURCE, GEO_QUERY, ValueError(f"solo {len(gdf)} departamentos con geometría"),
                            "verifica la capa; se esperan 33 entidades (32 + Bogotá).")
