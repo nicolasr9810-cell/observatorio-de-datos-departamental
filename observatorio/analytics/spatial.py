@@ -17,6 +17,7 @@ from libpysal.weights import KNN, Queen
 from libpysal.weights.util import attach_islands
 
 from observatorio.core.http import InsufficientDataError
+from observatorio.data.geo import polygonal_geometry
 
 PROJECTED = "EPSG:9377"   # MAGNA-SIRGAS Origen Nacional (distancias en metros)
 MIN_SPATIAL_N = 20
@@ -36,7 +37,21 @@ def align(gdf: gpd.GeoDataFrame, cs: pd.DataFrame) -> gpd.GeoDataFrame:
 
 def build_weights(gdf: gpd.GeoDataFrame, kind: str = "Reina (contigüidad)", k: int = 4):
     """Pesos estandarizados por fila. Islas (San Andrés) se conectan a su vecino más cercano."""
-    proj = gdf.to_crs(PROJECTED)
+    proj = gdf.to_crs(PROJECTED).copy()
+    polygonal = proj.geometry.map(polygonal_geometry)
+    invalid = [i for i, geom in enumerate(polygonal) if geom is None or geom.is_empty]
+    if invalid:
+        details = []
+        for i in invalid:
+            name = proj["departamento"].iloc[i] if "departamento" in proj else f"fila {i + 1}"
+            original = proj.geometry.iloc[i]
+            kind_name = getattr(original, "geom_type", "geometría nula")
+            details.append(f"{name} ({kind_name})")
+        raise ValueError(
+            "La contigüidad requiere un Polygon o MultiPolygon válido; "
+            f"no hay un área poligonal utilizable para: {', '.join(details)}."
+        )
+    proj = proj.set_geometry(polygonal)
     if kind.startswith("Reina"):
         w = Queen.from_dataframe(proj, use_index=False, silence_warnings=True)
         if w.islands:
