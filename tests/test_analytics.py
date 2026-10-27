@@ -163,3 +163,20 @@ def test_sar_branch(grid):
         assert 0.3 < fit.rho < 0.95 and fit.impacts is not None
     scenario = spatial.fit_sar(gdf, "y", ["x1", "x2"], w)
     assert 0.3 < scenario.rho < 0.95 and scenario.impacts is not None
+
+
+def test_sar_fit_handles_indicators_with_different_scales(grid):
+    rng = np.random.default_rng(22)
+    gdf = grid.copy()
+    w = spatial.build_weights(gdf)
+    z1, z2 = rng.normal(size=w.n), rng.normal(size=w.n)
+    y_scaled = np.linalg.solve(
+        np.eye(w.n) - 0.55 * w.full()[0], 1 + 1.5 * z1 - 0.8 * z2 + rng.normal(0, 0.15, w.n)
+    )
+    gdf["x1"] = 1e12 + z1 * 2e10
+    gdf["x2"] = 4.0 + z2 * 1e-4
+    gdf["y"] = 1e14 + y_scaled * 5e11
+    scenario = spatial.fit_sar(gdf, "y", ["x1", "x2"], w)
+    assert np.isfinite(scenario.rho)
+    assert np.isfinite(scenario.coefs["Coeficiente"]).all()
+    assert scenario.impacts is not None
