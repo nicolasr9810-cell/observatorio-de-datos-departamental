@@ -48,7 +48,23 @@ def run(fn, *args, **kwargs):
 
 
 def master():
-    return run(_master)
+    result = run(_master)
+    _, quality = result
+    if "Estado" in quality:
+        unavailable = quality[quality["Estado"] == "No disponible"]
+        if not unavailable.empty:
+            names = unavailable["Indicador"].dropna().astype(str).drop_duplicates().tolist()
+            shown = ", ".join(names[:3])
+            more = f" y {len(names) - 3} más" if len(names) > 3 else ""
+            st.warning(
+                f"Algunas fuentes no respondieron; el resto de los indicadores sigue disponible. "
+                f"No se cargó: {shown}{more}. Revisa **Datos y calidad** para ver el estado."
+            )
+            if st.button("Reintentar carga de datos", key="retry_data_sources",
+                         help="Vuelve a consultar las fuentes públicas; puede tardar un poco."):
+                _master.clear()
+                st.rerun()
+    return result
 
 
 def departments():
