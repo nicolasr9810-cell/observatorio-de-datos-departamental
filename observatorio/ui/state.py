@@ -11,6 +11,7 @@ import logging
 import streamlit as st
 
 from observatorio.analytics import dimred, explain, ml, spatial, timeseries
+from observatorio.config import GEO_CACHE_VERSION
 from observatorio.core.http import DataSourceError, InsufficientDataError
 from observatorio.data import geo
 from observatorio.data.pipeline import load_all
@@ -24,7 +25,8 @@ def _master():
 
 
 @st.cache_data(ttl=TTL * 4, show_spinner="Descargando límites departamentales DANE…")
-def _geo():
+def _geo(cache_version: str):
+    # La versión cambia con la capa fuente para no reutilizar geometrías antiguas.
     return geo.load_departments()
 
 
@@ -50,7 +52,7 @@ def master():
 
 
 def departments():
-    return run(_geo)
+    return run(_geo, GEO_CACHE_VERSION)
 
 
 # ---------- modelos cacheados (la clave incluye los datos y parámetros) ----------
