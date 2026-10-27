@@ -1,7 +1,7 @@
 # Observatorio Socioeconómico y de Competitividad de Colombia
 ## Énfasis analítico en Nariño
 
-Aplicación en Streamlit y Plotly. Las fuentes activas se consultan en vivo. No usa filas sintéticas, no rellena ausentes con cero y detiene la carga completa cuando falla una fuente obligatoria.
+Aplicación en Streamlit y Plotly. Las fuentes activas se consultan en vivo. No usa filas sintéticas ni rellena ausentes con cero. Si una fuente falla, conserva los indicadores disponibles y reporta los que faltan; los indicadores que dependen de población se omiten si esa base no responde.
 
 ## Estructura (v2, modular)
 
@@ -77,6 +77,6 @@ Sube el repositorio completo a GitHub (app.py, views/, observatorio/, requiremen
 
 Sigue colab_celdas.txt. El túnel de prueba usa pyngrok y requiere un token propio guardado en Colab Secrets con el nombre NGROK_AUTHTOKEN. No publiques el token en una celda ni en el repositorio.
 
-## Política fail-fast
+## Disponibilidad de fuentes
 
-Una caída HTTP, respuesta vacía, parseo inválido o cambio de esquema en una fuente activa detiene la carga. La interfaz imprime la URL, el error técnico y una acción sugerida. Reintenta tras revisar conectividad, endpoint o diccionario de campos.
+Una caída HTTP, respuesta vacía o cambio de esquema se registra en **Datos y calidad** y no bloquea las demás fuentes independientes. Los indicadores que dependen de población DANE se omiten si esa base no está disponible. La interfaz permite reintentar la carga; el detalle técnico queda en los logs de la aplicación.

@@ -5,7 +5,7 @@ conectores de datos, los modelos y la interfaz evolucionan por separado, y donde
 mismo código corre en Google Colab y en Streamlit.
 
 Se mantienen las reglas del proyecto: sin datos sintéticos, sin imputación,
-fail-fast con la URL y el error técnico, y trazabilidad de las filas descartadas.
+continuidad ante una fuente temporalmente caída, estado de cada fuente y trazabilidad de las filas descartadas.
 
 ---
 
@@ -42,7 +42,7 @@ observatorio/                    ← repositorio
 │   │   ├── maps.py              coropletas, LISA, diagrama de Moran
 │   │   └── charts.py            SHAP, biplot, IRF, pronóstico, mapas de calor
 │   └── ui/                      única capa que importa Streamlit
-│       ├── state.py             caché (cache_data / cache_resource) + run() fail-fast
+│       ├── state.py             caché (cache_data / cache_resource) + estado y reintento de fuentes
 │       └── components.py        selectores, tablas, descargas
 ├── tests/                       pytest; datos de prueba SOLO aquí
 ├── artifacts/                   modelos .joblib + metadatos .json
