@@ -3,6 +3,7 @@
 import streamlit as st
 
 from observatorio.analytics import spatial
+from observatorio.config import GEO_CACHE_VERSION
 from observatorio.core import panel
 from observatorio.ui import components as ui, state
 from observatorio.viz import maps
@@ -68,7 +69,11 @@ if year is None:
 m = state.run(panel.cross_section, master, variables, year, min_rows=spatial.MIN_SPATIAL_N)
 ui.dropped(m)
 gdf = state.run(spatial.align, state.departments(), m.data)
-w = state.run(state.weights, gdf, (tuple(gdf.codigo_divipola), wkind, k), wkind, k)
+w = state.run(
+    state.weights, gdf,
+    (tuple(gdf.codigo_divipola), GEO_CACHE_VERSION, wkind, k),
+    wkind, k,
+)
 y = gdf[target].to_numpy(float)
 mor = spatial.global_moran(y, w)
 lisa = spatial.local_moran(y, w)
