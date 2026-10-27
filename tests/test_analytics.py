@@ -2,13 +2,13 @@
 import numpy as np
 import pandas as pd
 import pytest
-from shapely.geometry import GeometryCollection, LineString, Point
+from shapely.geometry import GeometryCollection, LineString, Point, Polygon
 
 from observatorio.analytics import dimred, eda, explain, ml, policy, spatial, timeseries
 from observatorio.core import panel
 from observatorio.core.http import InsufficientDataError
 from observatorio.core.normalize import norm_code, norm_dept, to_number
-from observatorio.data.geo import to_geojson
+from observatorio.data.geo import polygonal_geometry, to_geojson
 from observatorio.viz import maps
 
 from conftest import IND
@@ -124,6 +124,13 @@ def test_spatial_weights_explain_nonpolygon_geometry(grid):
     points.at[0, "geometry"] = Point(-76.0, 1.0)
     with pytest.raises(ValueError, match="Polygon o MultiPolygon válido"):
         spatial.build_weights(points)
+
+
+def test_polygonal_geometry_repairs_invalid_polygon():
+    bowtie = Polygon([(0, 0), (2, 2), (0, 2), (2, 0), (0, 0)])
+    repaired = polygonal_geometry(bowtie)
+    assert repaired is not None and repaired.is_valid
+    assert repaired.geom_type in {"Polygon", "MultiPolygon"}
 
 
 def test_map_geojson_joins_by_department_code(grid):
