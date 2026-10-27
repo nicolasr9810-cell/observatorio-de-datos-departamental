@@ -88,9 +88,11 @@ st.caption("Un resultado estadísticamente significativo señala un patrón, no 
 
 t1, t2, t3 = st.tabs(["Mapa de la variable", "Clústeres LISA", "Modelo espacial"])
 with t1:
+    ui.map_loading_note()
     st.plotly_chart(maps.choropleth(gdf, gdf, target, f"{target} · {year}"), width="stretch")
     st.caption("Cada departamento se colorea según su valor del indicador seleccionado. Los valores faltantes se dejan en gris.")
 with t2:
+    ui.map_loading_note()
     a, b = st.columns([3, 2])
     a.plotly_chart(maps.lisa_map(gdf, lisa), width="stretch")
     b.plotly_chart(maps.moran_scatter(lisa, gdf.departamento, mor["I de Moran"]), width="stretch")
@@ -113,34 +115,34 @@ with t3:
         ui.fmt_table(fit.impacts)
     sar_fit = fit if fit.rho is not None else None
     if sar_fit is None:
-        with st.expander("Preparar un escenario espacial (opcional)"):
-            st.info(
-                f"Las pruebas recomiendan {fit.recommended}. Puedes ajustar un SAR aparte para explorar "
-                "posibles derrames; se mostrará como análisis de sensibilidad, no como modelo recomendado."
-            )
-            use_sar = st.toggle(
-                "Ajustar un SAR para la simulación",
-                value=False,
-                help="SAR supone que el indicador de cada departamento también depende del resultado en sus vecinos.",
-                key="sp_sim_sar",
-            )
-            if use_sar:
-                try:
-                    sar_fit = state.sar_model(
-                        gdf, w, (
-                            tuple(gdf.codigo_divipola), "sar-standardized-v2", int(year),
-                            target, tuple(feats), wkind, k,
-                            tuple(gdf[[target, *feats]].to_numpy().ravel()),
-                        ),
-                        target, tuple(feats),
-                    )
-                    st.success("SAR alternativo estimado para explorar escenarios.")
-                    ui.notes(sar_fit.notes)
-                    ui.fmt_table(sar_fit.coefs)
-                    ui.fmt_table(sar_fit.impacts)
-                except Exception as exc:  # noqa: BLE001
-                    st.warning(f"No fue posible ajustar el SAR alternativo: {type(exc).__name__}: {exc}")
-                    sar_fit = None
+        st.markdown("### Preparar simulación espacial")
+        st.info(
+            f"Las pruebas recomiendan {fit.recommended}. Si quieres explorar posibles derrames, "
+            "puedes ajustar un SAR adicional; se mostrará como análisis de sensibilidad, no como modelo recomendado."
+        )
+        use_sar = st.toggle(
+            "Ajustar SAR para habilitar la simulación de derrames",
+            value=False,
+            help="SAR supone que el indicador de cada departamento también depende del resultado en sus vecinos.",
+            key="sp_sim_sar",
+        )
+        if use_sar:
+            try:
+                sar_fit = state.sar_model(
+                    gdf, w, (
+                        tuple(gdf.codigo_divipola), "sar-standardized-v2", int(year),
+                        target, tuple(feats), wkind, k,
+                        tuple(gdf[[target, *feats]].to_numpy().ravel()),
+                    ),
+                    target, tuple(feats),
+                )
+                st.success("SAR alternativo estimado para explorar escenarios.")
+                ui.notes(sar_fit.notes)
+                ui.fmt_table(sar_fit.coefs)
+                ui.fmt_table(sar_fit.impacts)
+            except Exception as exc:  # noqa: BLE001
+                st.warning(f"No fue posible ajustar el SAR alternativo: {type(exc).__name__}: {exc}")
+                sar_fit = None
     st.session_state["sp_last"] = {
         "fit": fit, "sar": sar_fit, "gdf": gdf, "w": w,
         "feats": feats, "target": target, "year": year,

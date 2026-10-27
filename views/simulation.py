@@ -42,7 +42,7 @@ if engine.startswith("Espacial"):
             "elige un año con suficiente cobertura y, si las pruebas recomiendan OLS o SEM, activa "
             "la opción de SAR alternativo para escenarios."
         )
-        st.caption("Abre **Econometría espacial** desde el menú lateral para preparar el modelo SAR.")
+        st.page_link("views/spatial.py", label="Ir a Econometría espacial y preparar SAR", icon="🗺️")
         st.stop()
     fit, gdf, w = sar_fit, sp["gdf"], sp["w"]
     if getattr(fit, "notes", None):
@@ -67,6 +67,7 @@ if engine.startswith("Espacial"):
         f"Con ρ = {fit.rho:.3f} y β = {beta:.4f}, el cambio simulado agregado es "
         f"**{sim['Δy simulado'].sum():+,.3f}** en {sp['target']}."
     )
+    ui.map_loading_note()
     st.plotly_chart(maps.choropleth(gdf, sim, "Δy simulado", f"Efecto simulado sobre {sp['target']}",
                                     diverging=True, highlight=targets[0] if targets else None),
                     width="stretch")

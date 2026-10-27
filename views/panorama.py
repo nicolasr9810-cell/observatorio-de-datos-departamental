@@ -7,7 +7,7 @@ import plotly.express as px
 import streamlit as st
 
 from observatorio.core.normalize import norm
-from observatorio.ui import state
+from observatorio.ui import components as ui, state
 from observatorio.viz import maps
 
 def show_value(value: float, unit: str) -> str:
@@ -135,6 +135,7 @@ with tab0:
     myears = sorted(master.loc[master.indicador==indicator,"anio"].unique())
     myear = st.select_slider("Vigencia del mapa",myears,value=myears[-1],key="map_year") if len(myears) > 1 else myears[0]
     vals = master[(master.indicador==indicator)&(master.anio==myear)]
+    ui.map_loading_note()
     st.plotly_chart(maps.choropleth(gdf,vals,"valor",f"{indicator} · {myear}",vals.unidad.iloc[0] if len(vals) else ""),width="stretch")
 with tab1:
     choices = sorted(master.loc[master.indicador==indicator,"anio"].unique())

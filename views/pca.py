@@ -51,12 +51,14 @@ gdf = state.departments()
 t1, t2 = st.tabs(["Mapa del índice sintético", "Mapa de clústeres"])
 with t1:
     vals = res.index.reset_index()[["codigo_divipola", res.index.name]]
+    ui.map_loading_note()
     st.plotly_chart(maps.choropleth(gdf, vals, res.index.name, f"Índice sintético CP1 · {year}", "0–100"),
                     width="stretch")
     st.caption("El índice es CP1 reescalado; su lectura depende de la orientación elegida y de los indicadores.")
 with t2:
     cl = labels.reset_index()[["codigo_divipola", "Clúster"]]
-    fig = px.choropleth_map(gdf.merge(cl, on="codigo_divipola"), geojson=maps.to_geojson(gdf),
+    ui.map_loading_note()
+    fig = px.choropleth_map(gdf.merge(cl, on="codigo_divipola"), geojson=maps.map_geojson(gdf),
                             featureidkey="properties.codigo_divipola", locations="codigo_divipola",
                             color="Clúster", hover_name="departamento",
                             map_style="carto-positron", center=maps.CENTER, zoom=4.1, opacity=.8, height=620)
