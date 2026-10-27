@@ -11,7 +11,7 @@ from observatorio.config import DIVIPOLA, GEO_LOCAL, GEO_QUERY
 from observatorio.core.http import get_json, source_error
 from observatorio.core.normalize import norm_code
 
-SOURCE = "DANE geoportal - límites departamentales (servicio de pobreza 2012-2020)"
+SOURCE = "DANE Geoportal - capa de límites departamentales"
 
 
 def _polygon_parts(geometry) -> list:
@@ -44,11 +44,12 @@ def polygonal_geometry(geometry):
     return merged if merged.geom_type in {"Polygon", "MultiPolygon"} and not merged.is_empty else None
 
 
-def load_departments(simplify_deg: float = 0.01) -> gpd.GeoDataFrame:
+def load_departments() -> gpd.GeoDataFrame:
     """GeoDataFrame EPSG:4326 con columnas codigo_divipola, departamento, geometry.
 
     Prioriza un GeoJSON local (MGN DANE) si existe; si no, consulta el servicio ArcGIS
-    con geometría simplificada en el servidor (maxAllowableOffset) para aligerar la carga.
+    de la capa administrativa "Departamentos". Se descarga la geometría completa para
+    conservar las fronteras compartidas que necesita la contigüidad Reina.
     """
     local = Path(GEO_LOCAL)
     if local.exists():
@@ -60,7 +61,7 @@ def load_departments(simplify_deg: float = 0.01) -> gpd.GeoDataFrame:
     else:
         payload = get_json(SOURCE, GEO_QUERY, {
             "where": "1=1", "outFields": "DPTO_CCDGO,DPTO_CNMBR", "returnGeometry": "true",
-            "outSR": "4326", "maxAllowableOffset": simplify_deg, "f": "geojson",
+            "outSR": "4326", "f": "geojson",
         })
         feats = payload.get("features") if isinstance(payload, dict) else None
         if not feats:
