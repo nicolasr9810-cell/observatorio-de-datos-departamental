@@ -45,6 +45,8 @@ if engine.startswith("Espacial"):
         st.caption("Abre **Econometría espacial** desde el menú lateral para preparar el modelo SAR.")
         st.stop()
     fit, gdf, w = sar_fit, sp["gdf"], sp["w"]
+    if getattr(fit, "notes", None):
+        ui.notes(fit.notes)
     c1, c2, c3 = st.columns(3)
     var = c1.selectbox("Indicador que cambia (X)", sp["feats"],
                        help="Es una de las variables explicativas del SAR.")

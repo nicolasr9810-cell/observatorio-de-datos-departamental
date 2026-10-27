@@ -128,12 +128,14 @@ with t3:
                 try:
                     sar_fit = state.sar_model(
                         gdf, w, (
-                            tuple(gdf.codigo_divipola), int(year), target, tuple(feats), wkind, k,
+                            tuple(gdf.codigo_divipola), "sar-standardized-v2", int(year),
+                            target, tuple(feats), wkind, k,
                             tuple(gdf[[target, *feats]].to_numpy().ravel()),
                         ),
                         target, tuple(feats),
                     )
                     st.success("SAR alternativo estimado para explorar escenarios.")
+                    ui.notes(sar_fit.notes)
                     ui.fmt_table(sar_fit.coefs)
                     ui.fmt_table(sar_fit.impacts)
                 except Exception as exc:  # noqa: BLE001
