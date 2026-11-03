@@ -19,10 +19,15 @@ def show_value(value: float, unit: str) -> str:
         return f"{value:.3f}"
     if unit == "Grupos (conteo)" or unit == "Víctimas":
         return f"{value:,.0f}"
+    if unit == "Puntaje (0 a 100)":
+        return f"{value:.1f} pts"
     return f"{value:,.2f}"
 
 
 def reference(master: pd.DataFrame, indicator: str, year: int) -> tuple[float | None,str]:
+    if indicator == "Índice de Desempeño Fiscal (IDF)" and year == 2024:
+        # Promedio nacional publicado por el DNP para la vigencia 2024.
+        return 53.46,"Promedio nacional publicado por DNP"
     data = master[(master.indicador==indicator)&(master.anio==year)].copy()
     data["key"] = data.departamento.map(norm)
     national = data[data.key.isin({"colombia","nacional","total nacional"})]
@@ -39,9 +44,21 @@ def latest(master: pd.DataFrame, indicator: str) -> pd.Series | None:
 
 def pending() -> list[dict[str,str]]:
     return [
-        {"Dimensión":"Mercado laboral GEIH","Estado":"Pendiente",
-         "Nota":"Integrar anexos DANE y validar periodos, cobertura y comparabilidad.",
-         "Fuente":"https://www.dane.gov.co/index.php/estadisticas-por-tema/mercado-laboral/mercado-laboral-por-departamentos/mercado-laboral-por-departamento-historicos"},
+        {"Dimensión":"Mercado laboral: informalidad","Estado":"Pendiente",
+         "Nota":"La publicación regular se concentra en ciudades y dominios GEIH; Pasto no representa el departamento de Nariño. Se requiere una estimación departamental con microdatos, factores de expansión y errores de muestreo, o un anexo oficial departamental.",
+         "Fuente":"https://www.dane.gov.co/index.php/estadisticas-por-tema/mercado-laboral/empleo-informal-y-seguridad-social/empleo-informal-y-seguridad-social-historicos"},
+        {"Dimensión":"Brecha salarial de género","Estado":"Pendiente",
+         "Nota":"No se encontró una serie anual departamental homogénea con definición estable. Definir salario y población comparable antes de estimarla con microdatos GEIH/RELAB y sus ponderadores.",
+         "Fuente":"https://www.dane.gov.co/files/investigaciones/notas-estadisticas/dic-brecha-salarail-genero-2022-v3.pdf"},
+        {"Dimensión":"Densidad y dinámica empresarial","Estado":"Pendiente",
+         "Nota":"El REE y los registros mercantiles tienen universos, cortes y cobertura diferentes. Falta una tabla abierta anual por departamento de empresas activas, nacimientos y cierres con definición comparable y denominador poblacional.",
+         "Fuente":"https://www.dane.gov.co/index.php/servicios-al-ciudadano/servicios-informacion/registro-estadistico-de-empresas/directorio-estadistico-de-empresas"},
+        {"Dimensión":"Riesgo climático departamental","Estado":"Parcial",
+         "Nota":"Se integró vulnerabilidad IDEAM con corte 2017; no equivale a un índice actual de riesgo ni a una serie temporal. Falta una publicación departamental actualizada con amenaza, exposición y vulnerabilidad.",
+         "Fuente":"https://visualizador.ideam.gov.co/CatalogoObjetos/catalog/viewObjectIndex/17330947"},
+        {"Dimensión":"Anomalía de precipitación comparable","Estado":"Pendiente",
+         "Nota":"El indicador IDEAM de precipitación integrado es un índice anual en su escala oficial, no una anomalía contra un periodo de referencia. Falta validar una serie pluviométrica departamental con referencia y cobertura comparables.",
+         "Fuente":"https://visualizador.ideam.gov.co/gisserver/rest/services/Indicadores/INDICADORES_DATOS/MapServer/40"},
         {"Dimensión":"IDC","Estado":"Pendiente",
          "Nota":"Conectar la serie anual del Índice Departamental de Competitividad.",
          "Fuente":"https://compite.com.co/"},
@@ -51,9 +68,6 @@ def pending() -> list[dict[str,str]]:
         {"Dimensión":"Salud","Estado":"Pendiente",
          "Nota":"Faltan series departamentales con definición y denominador comprobados.",
          "Fuente":"https://www.dane.gov.co/index.php/estadisticas-por-tema/salud"},
-        {"Dimensión":"Deforestación","Estado":"Pendiente",
-         "Nota":"Confirmar campos, periodo y nivel geográfico del dataset IDEAM.",
-         "Fuente":"https://www.datos.gov.co/Ambiente-y-Desarrollo-Sostenible/Monitoreo-de-bosques/pb29-gexz"},
         {"Dimensión":"CTeI - inversión I+D","Estado":"Parcial",
          "Nota":"Grupos reconocidos miden capacidad científica, no gasto en I+D.",
          "Fuente":"https://minciencias.gov.co/ciudadano/datosabiertos"},
@@ -96,17 +110,26 @@ if chosen_depts:
     view = view[view.departamento.isin(chosen_depts)]
 
 st.markdown("### Indicadores clave de Nariño")
-kpis = [x for x in ["PIB por habitante","Homicidios por 100.000 habitantes","Pobreza monetaria","Coeficiente de Gini"] if x in set(master.indicador)]
-for col,name in zip(st.columns(max(1,len(kpis))),kpis):
-    row = latest(master,name)
-    if row is None:
-        col.metric(name,"Sin dato")
-    else:
-        ref,ref_name = reference(master,name,int(row.anio))
-        delta = None if ref is None else f"{row.valor-ref:+,.2f} vs ref."
-        col.metric(f"{name} · {int(row.anio)}",show_value(row.valor,row.unidad),delta,
-                   help=f"{ref_name}: {show_value(ref,row.unidad)}" if ref is not None else "Sin referencia")
-st.caption("Si no hay dato nacional publicado, la referencia es la media simple de otros departamentos, no un agregado ponderado nacional.")
+kpi_order = [
+    "PIB por habitante", "Homicidios por 100.000 habitantes", "Pobreza monetaria",
+    "Coeficiente de Gini", "Tasa de desempleo (GEIH)",
+    "Índice de Desempeño Fiscal (IDF)", "Tasa anual de deforestación (IDEAM)",
+    "Índice de vulnerabilidad al cambio climático (IDEAM, 2017)",
+    "Anomalía media anual de temperatura (IDEAM, estaciones)",
+]
+kpis = [name for name in kpi_order if name in set(master.indicador)]
+for start in range(0, len(kpis), 4):
+    group = kpis[start:start + 4]
+    for col,name in zip(st.columns(len(group)),group):
+        row = latest(master,name)
+        if row is None:
+            col.metric(name,"Sin dato")
+        else:
+            ref,ref_name = reference(master,name,int(row.anio))
+            delta = None if ref is None else f"{row.valor-ref:+,.2f} vs ref."
+            col.metric(f"{name} · {int(row.anio)}",show_value(row.valor,row.unidad),delta,
+                       help=f"{ref_name}: {show_value(ref,row.unidad)}" if ref is not None else "Sin referencia")
+st.caption("La referencia usa el promedio nacional publicado por DNP para el IDF 2024. En los demás indicadores, si no hay cifra nacional oficial integrada, muestra el promedio simple de otros departamentos con dato; no es una tasa nacional ponderada.")
 
 st.markdown("### Comparativa territorial")
 if view.empty:
@@ -118,6 +141,11 @@ else:
     if national.empty:
         refline = trend[trend.departamento!="Nariño"].groupby("anio",as_index=False).valor.mean()
         refline["departamento"] = "Promedio simple de otros departamentos"
+        if indicator == "Índice de Desempeño Fiscal (IDF)":
+            refline = refline[refline.anio != 2024]
+            refline = pd.concat([refline, pd.DataFrame([{
+                "anio": 2024, "valor": 53.46, "departamento": "Colombia (promedio DNP publicado)"
+            }])], ignore_index=True)
     else:
         refline = national[["anio","valor"]].copy()
         refline["departamento"] = "Colombia (dato publicado)"
@@ -171,8 +199,9 @@ with tab3:
     st.dataframe(quality,width="stretch",hide_index=True)
 
 with st.expander("Cobertura, límites y fuentes"):
-    st.markdown("Integrados: PIB, homicidios/tasa, recursos DNP, pobreza y Gini, coberturas/deserción MEN, grupos de investigación MinCiencias.")
+    st.markdown("Integrados: PIB, homicidios/tasa, recursos DNP, pobreza y Gini, educación MEN, grupos MinCiencias, desempleo GEIH, IDF, bosque/deforestación IDEAM, vulnerabilidad climática 2017 y anomalías en estaciones IDEAM.")
     st.markdown("El PIB integrado procede de un dataset publicado por Gobernación de Caldas en datos.gov.co, no de una API directa DANE. Los grupos MinCiencias son capacidad científica, no inversión en I+D.")
+    st.markdown("La tasa de desempleo GEIH cubre 23 departamentos y tiene quiebre metodológico en 2021. El IDF 2024 cambia metodología y se publica redondeado a un decimal. La serie departamental IDEAM llega a 2024: el resumen nacional 2025 no informa el dato de Nariño ni una tabla completa por departamento. La tasa IDEAM conserva el signo: valores negativos indican pérdida de bosque y el eje usa el año final del periodo anual. Vulnerabilidad tiene un solo corte (2017) y se agrega ponderando por área municipal. Las anomalías climáticas promedian estaciones de referencia; no equivalen a promedios espaciales departamentales.")
     st.dataframe(pd.DataFrame(pending()),width="stretch",hide_index=True)
-    st.markdown("Las fuentes se consultan en vivo. Para población, pobreza y Gini se prueban rutas oficiales alternativas y copias locales; la vista Datos y calidad identifica el origen y la fecha de corte. Los demás indicadores conservan su estado independiente.")
+    st.markdown("La vista Datos y calidad muestra si cada indicador provino de consulta en vivo o de un snapshot oficial local, junto con su fecha de corte y notas metodológicas.")
 st.caption("Caché de seis horas. Los datos se consultan desde las fuentes enlazadas al cargar.");
