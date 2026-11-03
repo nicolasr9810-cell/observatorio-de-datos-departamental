@@ -2,6 +2,8 @@
 """Constantes globales: endpoints, DIVIPOLA y parámetros de red."""
 from __future__ import annotations
 
+from pathlib import Path
+
 TIMEOUT = (15, 90)
 LIMIT = 50000
 HEADERS = {"User-Agent": "ObservatorioColombia/1.0 (datos abiertos)"}
@@ -9,6 +11,9 @@ SODA = "https://www.datos.gov.co/resource"
 POP_XLSX = "https://www.dane.gov.co/files/censo2018/proyecciones-de-poblacion/Departamental/PPED-AreaDep-2018-2050_VP.xlsx"
 POVERTY = "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/Serv_Deptos_Pobreza_2012_2020/MapServer/2/query"
 GINI = "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/Serv_Deptos_CoeficienteGini_2012_2020/MapServer/2/query"
+POVERTY_MIRROR = POVERTY.replace("https://geoportal.dane.gov.co", "https://portalgis.dane.gov.co")
+GINI_MIRROR = GINI.replace("https://geoportal.dane.gov.co", "https://portalgis.dane.gov.co")
+DANE_BACKUP_DIR = Path(__file__).resolve().parents[1] / "data" / "respaldo"
 
 DIVIPOLA = {
     "05":"Antioquia","08":"Atlántico","11":"Bogotá D.C.","13":"Bolívar",
