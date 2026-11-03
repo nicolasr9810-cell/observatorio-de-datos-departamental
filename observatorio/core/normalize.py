@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from difflib import get_close_matches
 from typing import Any
 
 import pandas as pd
@@ -37,7 +38,15 @@ def norm_dept(name: Any, code: Any = None) -> tuple[str | None, str | None]:
     code = norm_code(code)
     if code:
         return DIVIPOLA[code], code
-    name = DEPT_LOOKUP.get(norm(name))
+    raw_name = name
+    key = norm(name)
+    name = DEPT_LOOKUP.get(key)
+    # Algunas hojas XLS y servicios ArcGIS antiguos llegan con U+FFFD en lugar
+    # de una vocal/letra acentuada (p. ej. "Nari\ufffdo"). Solo hacemos una
+    # coincidencia aproximada cuando detectamos esa corrupción de codificación.
+    if name is None and isinstance(raw_name, str) and "\ufffd" in raw_name:
+        matches = get_close_matches(key, list(DEPT_LOOKUP), n=1, cutoff=0.80)
+        name = DEPT_LOOKUP[matches[0]] if matches else None
     return (name, CODE[name]) if name else (None, None)
 
 
