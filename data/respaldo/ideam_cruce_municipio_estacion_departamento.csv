@@ -1,0 +1,46 @@
+﻿municipio_fuente,municipio_key,departamento,codigo_divipola,estacion_referencia,fuente_cruce
+Medellín,medellin,Antioquia,05,Aeropuerto Olaya Herrera,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Rionegro,rionegro,Antioquia,05,Aeropuerto José María Córdova,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Barranquilla,barranquilla,Atlántico,08,Aeropuerto Ernesto Cortissoz,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Soledad,soledad,Atlántico,08,Aeropuerto Ernesto Cortissoz,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Bogotá,bogota,Bogotá D.C.,11,Estación Tibaitatá,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Cartagena,cartagena,Bolívar,13,Aeropuerto Rafael Núñez,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Duitama,duitama,Boyacá,15,Estación La Sierra,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Tunja,tunja,Boyacá,15,Estación Universidad UPTC,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Manizales,manizales,Caldas,17,Aeropuerto La Nubia,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Florencia,florencia,Caquetá,18,Aeropuerto Gustavo Artunduaga,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Popayán,popayan,Cauca,19,Aeropuerto Guillermo León Valencia,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Valledupar,valledupar,Cesar,20,Aeropuerto Alfonso López,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Montería,monteria,Córdoba,23,Aeropuerto Los Garzones,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Quibdó,quibdo,Chocó,27,Aeropuerto El Caraño,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Neiva,neiva,Huila,41,Aeropuerto Benito Salas,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Riohacha,riohacha,La Guajira,44,Estación Almirante Padilla,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Santa Marta,santa marta,Magdalena,47,Aeropuerto Simón Bolívar,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Villavicencio,villavicencio,Meta,50,Estación La Libertad,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Chachagüí,chachagui,Nariño,52,Aeropuerto Antonio Nariño,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Pasto,pasto,Nariño,52,Estación Obonuco,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Cúcuta,cucuta,Norte de Santander,54,Aeropuerto Camilo Daza,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Armenia,armenia,Quindío,63,Aeropuerto El Edén,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Pereira,pereira,Risaralda,66,Aeropuerto Matecaña,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Barrancabermeja,barrancabermeja,Santander,68,Aeropuerto Yariguíes,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Bucaramanga,bucaramanga,Santander,68,Estación La Floresta,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Lebrija,lebrija,Santander,68,Aeropuerto Palonegro,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Sampués,sampues,Sucre,70,Estación Universidad de Sucre,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Ibagué,ibague,Tolima,73,Aeropuerto Perales,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Buenaventura,buenaventura,Valle del Cauca,76,Aeropuerto Buenaventura,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Cali,cali,Valle del Cauca,76,Estación Universidad del Valle,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Palmira,palmira,Valle del Cauca,76,Aeropuerto Alfonso Bonilla Aragón,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Arauca,arauca,Arauca,81,Aeropuerto Santiago Pérez,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Yopal,yopal,Casanare,85,Aeropuerto Yopal,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Mocoa,mocoa,Putumayo,86,Estación acueducto Mocoa,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Puerto Asís,puerto asis,Putumayo,86,Estación Puerto Asís,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Villagarzón,villagarzon,Putumayo,86,Estación Puerto Umbría,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Providencia,providencia,San Andrés y Providencia,88,Aeropuerto El Embrujo,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+San Andrés,san andres,San Andrés y Providencia,88,Aeropuerto Sesquicentenario,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Leticia,leticia,Amazonas,91,Aeropuerto Vásquez Cobo,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Inírida,inirida,Guainía,94,Estación Inírida,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+San José del Guaviare,san jose del guaviare,Guaviare,95,Estación Mapiripana,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+San José Guaviare,san jose guaviare,Guaviare,95,Estación El Trueno,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Mitú,mitu,Vaupés,97,Estación Mitú,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Cumaribo,cumaribo,Vichada,99,Estación Las Gaviotas,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
+Puerto Carreño,puerto carreno,Vichada,99,Aeropuerto Puerto Carreño,Catálogo Nacional de Estaciones IDEAM + municipio reportado por IDEAM
