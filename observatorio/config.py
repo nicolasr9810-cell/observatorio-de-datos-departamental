@@ -33,7 +33,7 @@ ALIASES = {
     "san andres y providencia":"San Andrés y Providencia",
     "archipielago de san andres":"San Andrés y Providencia",
     "archipielago de san andres providencia y santa catalina":"San Andrés y Providencia",
-    "valle":"Valle del Cauca",
+    "valle":"Valle del Cauca", "guajira":"La Guajira",
 }
 
 # Límites administrativos DANE MGN, servidos por el espejo ArcGIS Colombia.
