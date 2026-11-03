@@ -24,7 +24,11 @@ def _unavailable(quality: list[dict], indicator: str, source: str, exc: Exceptio
 def _try_load(parts: list[pd.DataFrame], quality: list[dict], indicator: str,
               source: str, loader, *args):
     try:
-        parts.extend(loader(*args))
+        loaded = loader(*args)
+        if isinstance(loaded, pd.DataFrame):
+            parts.append(loaded)
+        else:
+            parts.extend(loaded)
         return True
     except (DataSourceError, ValueError) as exc:
         _unavailable(quality, indicator, source, exc)
@@ -64,6 +68,16 @@ def load_all() -> tuple[pd.DataFrame, pd.DataFrame]:
               L.load_education, quality)
     _try_load(parts, quality, "Grupos de investigación reconocidos", "MinCiencias - grupos reconocidos",
               L.load_ctei, quality)
+    _try_load(parts, quality, "Tasa de desempleo departamental", "DANE - GEIH por departamentos",
+              L.load_unemployment, quality)
+    _try_load(parts, quality, "Índice de Desempeño Fiscal (IDF)", "DNP - resultados IDF departamental",
+              L.load_idf, quality)
+    _try_load(parts, quality, "Deforestación y cobertura boscosa", "IDEAM - indicadores de bosque por departamento",
+              L.load_forest, quality)
+    _try_load(parts, quality, "Anomalías climáticas en estaciones", "IDEAM - estaciones de referencia + cruce municipal",
+              L.load_climate, quality)
+    _try_load(parts, quality, "Vulnerabilidad al cambio climático", "IDEAM - índice TCNCC 2017",
+              L.load_climate_vulnerability, quality)
 
     if not parts:
         raise DataSourceError("FALLÓ EL PIPELINE: no quedaron indicadores válidos. Revisa las fuentes y vuelve a intentar.")
