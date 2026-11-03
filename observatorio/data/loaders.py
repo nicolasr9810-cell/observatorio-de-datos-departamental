@@ -8,13 +8,14 @@ from io import BytesIO
 
 import pandas as pd
 
-from observatorio.config import GINI, POP_XLSX, POVERTY, SODA, LIMIT
-from observatorio.core.http import get_bytes, get_json, soda_all, source_error
+from observatorio.config import (DANE_BACKUP_DIR, GINI, GINI_MIRROR, POP_XLSX, POVERTY,
+                                 POVERTY_MIRROR, SODA, LIMIT)
+from observatorio.core.http import DataSourceError, get_bytes, get_json, soda_all, source_error
 from observatorio.core.normalize import norm, norm_dept, norm_year, to_number
 from observatorio.core.schema import standardize
 
 
-def load_population(quality: list) -> pd.DataFrame:
+def _load_population_live(quality: list) -> pd.DataFrame:
     """Lee el anexo DANE por área geográfica y conserva el renglón Total."""
     source = "DANE - proyecciones departamentales de población"
     content = get_bytes(source, POP_XLSX)
@@ -85,6 +86,48 @@ def load_population(quality: list) -> pd.DataFrame:
         ValueError(f"no se reconoció la tabla larga DP/DPNOM/AÑO/ÁREA GEOGRÁFICA/TOTAL; hojas: {list(sheets)}"),
         "revisa encabezados de código, departamento, año, área y población en el anexo DANE.",
     )
+
+
+
+def load_population(quality: list) -> pd.DataFrame:
+    """Usa el anexo DANE en vivo y recurre al CSV versionado si no responde."""
+    source = "DANE - proyecciones departamentales de población"
+    try:
+        return _load_population_live(quality)
+    except Exception as live_exc:
+        backup = DANE_BACKUP_DIR / "dane_poblacion_departamental_2018_2050.csv"
+        try:
+            pop = pd.read_csv(backup, dtype={"codigo_divipola": "string"})
+            required = {"departamento", "codigo_divipola", "anio", "valor"}
+            if not required.issubset(pop.columns):
+                raise ValueError(f"faltan columnas: {sorted(required - set(pop.columns))}")
+            geo = [norm_dept(pop.at[i, "departamento"], pop.at[i, "codigo_divipola"])
+                   for i in pop.index]
+            pop["departamento"] = [item[0] for item in geo]
+            pop["codigo_divipola"] = [item[1] for item in geo]
+            pop["anio"] = pop["anio"].map(norm_year)
+            pop["valor"] = to_number(pop["valor"])
+            pop = pop.dropna(subset=["departamento", "codigo_divipola", "anio", "valor"]).copy()
+            pop["anio"] = pop["anio"].astype(int)
+            if pop.empty:
+                raise ValueError("el CSV de respaldo no contiene filas válidas")
+            if pop.duplicated(["codigo_divipola", "anio"]).any():
+                raise ValueError("el CSV de respaldo contiene duplicados por DIVIPOLA y año")
+        except Exception as backup_exc:
+            raise source_error(
+                source, f"{POP_XLSX} | respaldo local: {backup}",
+                ValueError(f"fuente en vivo: {type(live_exc).__name__}: {live_exc}; "
+                           f"respaldo: {type(backup_exc).__name__}: {backup_exc}"),
+                "verifica la conectividad DANE y que exista un CSV de respaldo válido en data/respaldo.",
+            ) from backup_exc
+        quality.append({
+            "Indicador": "Población de referencia",
+            "Estado": "Respaldo local",
+            "Filas válidas": len(pop),
+            "Fuente": "DANE - proyecciones 2018-2050; copia estática descargada 2026-11-03",
+            "Detalle": f"Se usó {backup.name} tras fallar el XLSX en vivo.",
+        })
+        return pop[["departamento", "codigo_divipola", "anio", "valor"]]
 
 
 def load_gdp(population: pd.DataFrame, quality: list) -> list[pd.DataFrame]:
@@ -190,54 +233,110 @@ def load_finance(population: pd.DataFrame, quality: list) -> list[pd.DataFrame]:
 
 def load_poverty_gini(quality: list) -> list[pd.DataFrame]:
     specs = [
-        (POVERTY,"DANE - incidencia de pobreza monetaria",r"^IP_AM_(\d{4})$",
-         "Pobreza monetaria","Porcentaje",
-         "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/Serv_Deptos_Pobreza_2012_2020/MapServer"),
-        (GINI,"DANE - coeficiente de Gini",r"^GINI_(\d{4})$",
-         "Coeficiente de Gini","Coeficiente (0 a 1)",
-         "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/Serv_Deptos_CoeficienteGini_2012_2020/MapServer"),
+        (POVERTY, POVERTY_MIRROR, "DANE - incidencia de pobreza monetaria",
+         r"^IP_AM_(\d{4})$", "Pobreza monetaria", "Porcentaje",
+         "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/Serv_Deptos_Pobreza_2012_2020/MapServer",
+         "dane_pobreza_departamental_2012_2020.csv"),
+        (GINI, GINI_MIRROR, "DANE - coeficiente de Gini",
+         r"^GINI_(\d{4})$", "Coeficiente de Gini", "Coeficiente (0 a 1)",
+         "https://geoportal.dane.gov.co/mparcgis/rest/services/INDICADORES_COND_DE_VIDA/Serv_Deptos_CoeficienteGini_2012_2020/MapServer",
+         "dane_gini_departamental_2012_2020.csv"),
     ]
     result = []
-    for endpoint,source,pattern,indicator,unit,public_url in specs:
-        source_quality = []
-        try:
-            payload = get_json(source,endpoint,{
-                "where":"1=1","outFields":"*","returnGeometry":"false","f":"json"
-            })
-            features = payload.get("features") if isinstance(payload,dict) else None
-            if not features:
-                raise source_error(source,endpoint,ValueError("ArcGIS devolvió cero entidades"),
-                                   "revisa disponibilidad del servicio y el ID de capa.")
-            records = []
-            for feature in features:
-                attrs = feature.get("attributes",{})
-                dept,code = norm_dept(attrs.get("DPTO_CNMBR"),attrs.get("DPTO_CCDGO"))
-                if not dept:
-                    continue
-                for field,value in attrs.items():
-                    match = re.match(pattern,str(field),flags=re.I)
-                    if match:
-                        records.append({"departamento":dept,"codigo_divipola":code,
-                                        "anio":int(match.group(1)),"valor":value})
-            if not records:
-                raise source_error(source,endpoint,ValueError("no hay campos anuales esperados"),
-                                   "inspecciona los campos ArcGIS y actualiza el patrón.")
-            frame = standardize(
-                pd.DataFrame(records),"departamento","anio","valor",indicator,
-                "Pobreza y desigualdad",unit,source,public_url,
-                code="codigo_divipola",quality=source_quality,
-            )
-        except Exception as exc:  # Aísla cada servicio DANE para que Gini u otros datos sigan cargando.
-            logging.warning("No se pudo cargar %s: %s", source, exc)
+    for endpoint, mirror, source, pattern, indicator, unit, public_url, backup_name in specs:
+        frame = None
+        failures = []
+        transport_failures = 0
+        schema_failures = 0
+        candidates = [
+            (endpoint, public_url, source, "En vivo"),
+            (mirror, public_url.replace("https://geoportal.dane.gov.co", "https://portalgis.dane.gov.co"),
+             "DANE PortalGIS (espejo oficial)", "Espejo oficial"),
+        ]
+        for query_url, source_url, source_label, state in candidates:
+            try:
+                payload = get_json(source_label, query_url, {
+                    "where": "1=1", "outFields": "*", "returnGeometry": "false", "f": "json"
+                })
+            except DataSourceError as exc:
+                transport_failures += 1
+                failures.append(f"{source_label}: {type(exc).__name__}: {exc}")
+                logging.warning("No respondió %s para %s: %s", source_label, indicator, exc)
+                continue
+
+            source_quality = []
+            try:
+                features = payload.get("features") if isinstance(payload, dict) else None
+                if not features:
+                    raise ValueError("ArcGIS devolvió cero entidades o un esquema inesperado")
+                records = []
+                for feature in features:
+                    attrs = feature.get("attributes", {})
+                    dept, code = norm_dept(attrs.get("DPTO_CNMBR"), attrs.get("DPTO_CCDGO"))
+                    if not dept:
+                        continue
+                    for field, value in attrs.items():
+                        match = re.match(pattern, str(field), flags=re.I)
+                        if match:
+                            records.append({"departamento": dept, "codigo_divipola": code,
+                                            "anio": int(match.group(1)), "valor": value})
+                if not records:
+                    raise ValueError("no hay campos anuales esperados en la respuesta")
+                frame = standardize(
+                    pd.DataFrame(records), "departamento", "anio", "valor", indicator,
+                    "Pobreza y desigualdad", unit, f"{source_label} - {source}", source_url,
+                    code="codigo_divipola", quality=source_quality,
+                )
+                for item in source_quality:
+                    item["Estado"] = state
+                quality.extend(source_quality)
+                break
+            except Exception as exc:
+                schema_failures += 1
+                failures.append(f"{source_label}: {type(exc).__name__}: {exc}")
+                logging.warning("Respuesta incompatible de %s para %s: %s", source_label, indicator, exc)
+
+        if frame is None and transport_failures == len(candidates):
+            backup = DANE_BACKUP_DIR / backup_name
+            try:
+                cached = pd.read_csv(backup, dtype={"codigo_divipola": "string"})
+                required = {"departamento", "codigo_divipola", "anio", "valor"}
+                if not required.issubset(cached.columns):
+                    raise ValueError(f"faltan columnas: {sorted(required - set(cached.columns))}")
+                frame = standardize(
+                    cached, "departamento", "anio", "valor", indicator,
+                    "Pobreza y desigualdad", unit,
+                    f"DANE - serie histórica 2012-2020 (respaldo local descargado 2026-11-03)",
+                    public_url, code="codigo_divipola", quality=None,
+                )
+                if frame.empty:
+                    raise ValueError("el CSV de respaldo no contiene filas válidas")
+                quality.append({
+                    "Indicador": indicator,
+                    "Estado": "Respaldo local",
+                    "Filas válidas": len(frame),
+                    "Fuente": f"DANE - Geoportal histórico 2012-2020 | {backup.name}",
+                    "Detalle": "Se usó una copia oficial versionada después de no responder ni el servicio ni el espejo.",
+                })
+            except Exception as backup_exc:
+                logging.error("Fallaron las fuentes y el respaldo de %s: %s", indicator, backup_exc)
+                quality.append({
+                    "Indicador": indicator,
+                    "Estado": "No disponible",
+                    "Filas válidas": 0,
+                    "Detalle": f"Fallaron el servicio, el espejo oficial y el CSV local: {type(backup_exc).__name__}: {backup_exc}",
+                    "Fuente": source,
+                })
+                continue
+        elif frame is None:
             quality.append({
                 "Indicador": indicator,
                 "Estado": "No disponible",
                 "Filas válidas": 0,
-                "Detalle": "No se pudo consultar en esta carga. Revisa la conexión e inténtalo de nuevo.",
+                "Detalle": "Una fuente respondió, pero su esquema no pasó la validación; se requiere actualizar el mapeo antes de usar un respaldo.",
                 "Fuente": source,
             })
             continue
-        quality.extend(source_quality)
         result.append(frame)
     return result
 
