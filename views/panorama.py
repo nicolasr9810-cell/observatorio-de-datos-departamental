@@ -174,5 +174,5 @@ with st.expander("Cobertura, límites y fuentes"):
     st.markdown("Integrados: PIB, homicidios/tasa, recursos DNP, pobreza y Gini, coberturas/deserción MEN, grupos de investigación MinCiencias.")
     st.markdown("El PIB integrado procede de un dataset publicado por Gobernación de Caldas en datos.gov.co, no de una API directa DANE. Los grupos MinCiencias son capacidad científica, no inversión en I+D.")
     st.dataframe(pd.DataFrame(pending()),width="stretch",hide_index=True)
-    st.markdown("Las fuentes activas son obligatorias: una caída o cambio de esquema detiene la carga y muestra error técnico y recomendación.")
+    st.markdown("Las fuentes se consultan en vivo. Para población, pobreza y Gini se prueban rutas oficiales alternativas y copias locales; la vista Datos y calidad identifica el origen y la fecha de corte. Los demás indicadores conservan su estado independiente.")
 st.caption("Caché de seis horas. Los datos se consultan desde las fuentes enlazadas al cargar.");
