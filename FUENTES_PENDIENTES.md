@@ -13,4 +13,4 @@ Solo se activan fuentes con territorio, periodo, unidad y metodología verificab
 
 ## Contrato del conector
 
-Cada módulo nuevo debe entregar departamento, código DIVIPOLA, año, indicador, categoría, valor, unidad, fuente y URL. Debe detenerse con un error técnico y recomendación si falla la descarga o el esquema. Tasas solo se calculan cuando numerador y denominador son compatibles para el mismo territorio y periodo.
+Cada módulo nuevo debe entregar departamento, código DIVIPOLA, año, indicador, categoría, valor, unidad, fuente y URL. Si falla la consulta en vivo, primero intenta un espejo oficial y/o un snapshot local versionado; si no existe un respaldo válido, registra el error técnico y deja ese indicador no disponible. No usa datos sintéticos ni rellena huecos. Tasas solo se calculan cuando numerador y denominador son compatibles para el mismo territorio y periodo.

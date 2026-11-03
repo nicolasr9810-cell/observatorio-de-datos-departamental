@@ -77,6 +77,12 @@ Sube el repositorio completo a GitHub (app.py, views/, observatorio/, requiremen
 
 Sigue colab_celdas.txt. El túnel de prueba usa pyngrok y requiere un token propio guardado en Colab Secrets con el nombre NGROK_AUTHTOKEN. No publiques el token en una celda ni en el repositorio.
 
+## Respaldo DANE sin conexión
+
+La app consulta primero los servicios DANE en vivo. Pobreza y Gini prueban el Geoportal y su espejo oficial PortalGIS; si ambos fallan, usan los CSV versionados en `data/respaldo/`. La población usa el XLSX oficial y recurre al CSV local si falla la descarga o el parseo. La vista **Datos y calidad** marca el resultado como `En vivo`, `Espejo oficial`, `Respaldo local` o `No disponible`.
+
+Los snapshots incluidos mantienen la serie histórica 2012-2020 de las capas activas y las proyecciones de población 2018-2050. Se descargaron el 3 de noviembre de 2026 y no se actualizan solos: revisa `data/respaldo/README.md` al renovar los CSV. DANE también publica un anexo departamental 2021-2025; consérvalo como serie aparte hasta validar la comparabilidad metodológica con la capa 2012-2020.
+
 ## Disponibilidad de fuentes
 
 Una caída HTTP, respuesta vacía o cambio de esquema se registra en **Datos y calidad** y no bloquea las demás fuentes independientes. Los indicadores que dependen de población DANE se omiten si esa base no está disponible. La interfaz permite reintentar la carga; el detalle técnico queda en los logs de la aplicación.
