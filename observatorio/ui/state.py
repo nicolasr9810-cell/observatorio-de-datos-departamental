@@ -51,6 +51,14 @@ def master():
     result = run(_master)
     _, quality = result
     if "Estado" in quality:
+        local_backup = quality[quality["Estado"] == "Respaldo local"]
+        if not local_backup.empty:
+            names = ", ".join(local_backup["Indicador"].dropna().astype(str).drop_duplicates().tolist())
+            st.info(f"Se muestran copias oficiales locales para: {names}. Consulta Datos y calidad para ver el corte y la fuente.")
+        official_mirror = quality[quality["Estado"] == "Espejo oficial"]
+        if not official_mirror.empty:
+            names = ", ".join(official_mirror["Indicador"].dropna().astype(str).drop_duplicates().tolist())
+            st.info(f"Se consultó el espejo oficial de DANE para: {names}.")
         unavailable = quality[quality["Estado"] == "No disponible"]
         if not unavailable.empty:
             names = unavailable["Indicador"].dropna().astype(str).drop_duplicates().tolist()
@@ -60,6 +68,7 @@ def master():
                 f"Algunas fuentes no respondieron; el resto de los indicadores sigue disponible. "
                 f"No se cargó: {shown}{more}. Revisa **Datos y calidad** para ver el estado."
             )
+        if not unavailable.empty or not local_backup.empty or not official_mirror.empty:
             if st.button("Reintentar carga de datos", key="retry_data_sources",
                          help="Vuelve a consultar las fuentes públicas; puede tardar un poco."):
                 _master.clear()
